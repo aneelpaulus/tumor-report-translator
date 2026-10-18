@@ -1,0 +1,1151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tumor Report Translator</title>
+<meta name="description" content="Paste or upload a tumor DNA test report and get each finding explained in plain English, with FDA-approved drugs and recruiting trials for that change. The report stays on your device.">
+<style>
+  :root {
+    --bg: #f6f6f3; --card: #fcfcfb; --text: #1c1c1e; --muted: #52514e; --line: #e1e1dc;
+    --accent: #1d5c86; --accent-text: #ffffff; --soft: #e4eef6;
+    --ok: #1d6f42; --okbg: #e5f3eb;
+    --warn: #7d5300; --warnbg: #fcf0d6;
+    --vio: #5b3fb3; --viobg: #eeeafb;
+    --gray: #4a4a4a; --graybg: #ececec;
+    --bad: #9e2428; --badbg: #fae5e5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121314; --card: #1a1a19; --text: #f0efec; --muted: #c3c2b7; --line: #34342f;
+      --accent: #5aa3d6; --accent-text: #0b1620; --soft: #172a39;
+      --ok: #7fd3a3; --okbg: #183225;
+      --warn: #f0c46b; --warnbg: #3a2e14;
+      --vio: #b9a9f5; --viobg: #2a2342;
+      --gray: #c8c8c8; --graybg: #2c2d30;
+      --bad: #f09a9d; --badbg: #3d1d1f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 17px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 880px; margin: 0 auto; padding: 24px 16px 56px; }
+  h1 { font-size: 1.75rem; margin: 0 0 6px; }
+  h2 { font-size: 1.25rem; margin: 32px 0 10px; }
+  h3 { font-size: 1.1rem; margin: 0; }
+  .lede { color: var(--muted); margin: 0 0 14px; }
+  label { font-weight: 600; display: block; margin-bottom: 6px; }
+  textarea, select { width: 100%; font: inherit; background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; }
+  textarea { min-height: 170px; font-size: 15px; resize: vertical; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+  button { font: inherit; border-radius: 10px; padding: 10px 16px; cursor: pointer; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: 0.55; cursor: default; }
+  .file { position: relative; overflow: hidden; display: inline-block; }
+  .file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .hint { color: var(--muted); font-size: 0.88rem; }
+  .status { color: var(--muted); font-size: 0.92rem; min-height: 1.4em; margin-top: 6px; }
+  .status.err { color: var(--bad); }
+  .privacy { background: var(--okbg); color: var(--ok); border-radius: 12px; padding: 10px 14px; font-size: 0.9rem; margin: 10px 0 18px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin: 10px 0; }
+  .callout { border-radius: 14px; padding: 14px 16px; margin: 12px 0; }
+  .callout.info { background: var(--soft); }
+  .callout.warn { background: var(--warnbg); color: var(--warn); }
+  .tiles { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin: 10px 0; }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  .tile .num { font-size: 1.5rem; font-weight: 700; }
+  .badge { display: inline-block; font-size: 0.76rem; font-weight: 700; padding: 2px 9px; border-radius: 999px; margin: 2px 4px 2px 0; white-space: nowrap; }
+  .b-ok { color: var(--ok); background: var(--okbg); }
+  .b-warn { color: var(--warn); background: var(--warnbg); }
+  .b-vio { color: var(--vio); background: var(--viobg); }
+  .b-gray { color: var(--gray); background: var(--graybg); }
+  .b-bad { color: var(--bad); background: var(--badbg); }
+  .finding .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; margin-bottom: 6px; }
+  .finding .name { font-size: 1.2rem; font-weight: 700; }
+  .finding p { margin: 6px 0; }
+  .sub { font-weight: 600; margin-top: 12px; font-size: 0.95rem; }
+  ul.clean { margin: 6px 0; padding-left: 20px; }
+  ul.clean li { margin: 5px 0; }
+  .drug a { font-weight: 600; }
+  .quote { color: var(--muted); font-size: 0.88rem; }
+  .tech { display: none; border-top: 1px dashed var(--line); margin-top: 12px; padding-top: 10px; font-size: 0.9rem; }
+  body.show-tech .tech { display: block; }
+  .switch { display: inline-flex; align-items: center; gap: 8px; font-size: 0.92rem; cursor: pointer; }
+  .switch input { width: 18px; height: 18px; }
+  details > summary { cursor: pointer; color: var(--accent); font-size: 0.92rem; margin-top: 8px; }
+  .gloss dt { font-weight: 700; margin-top: 10px; }
+  .gloss dd { margin: 2px 0 0; color: var(--muted); }
+  footer { margin-top: 40px; color: var(--muted); font-size: 0.84rem; }
+  a { color: var(--accent); }
+  .kit { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; font-size: 0.85rem; margin: 0 0 18px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .kit a { color: var(--muted); text-decoration: none; }
+  .kit a:hover { color: var(--accent); text-decoration: underline; }
+  .kit a.here { color: var(--text); font-weight: 600; }
+  .kit a.home { color: var(--accent); font-weight: 700; }
+</style>
+</head>
+<body>
+<main>
+  <nav class="kit" aria-label="Toolkit"><a class="home" href="https://aneelpaulus.github.io/">Medical AI Toolkit</a><a href="https://aneelpaulus.github.io/drug-label-explainer/">Drug Label Explainer</a><a href="https://aneelpaulus.github.io/tumor-report-translator/" class="here" aria-current="page">Tumor Report Translator</a><a href="https://aneelpaulus.github.io/adverse-event-explorer/">Adverse Event Explorer</a><a href="https://aneelpaulus.github.io/drug-target-tracker/">Drug Target Tracker</a><a href="https://aneelpaulus.github.io/citation-checker/">Citation Checker</a></nav>
+  <h1>Tumor Report Translator</h1>
+  <p class="lede">Got a tumor DNA test report (sometimes called genomic, molecular, or next-generation sequencing testing, from labs like Foundation Medicine, Tempus, or Caris)? Paste it or upload the PDF to see each finding explained in plain English, along with FDA-approved drugs and recruiting clinical trials for that change.</p>
+  <div class="privacy"><strong>Your report stays on your device.</strong> It is read inside your own browser. Only the gene names and changes found (for example "KRAS G12C") and the cancer type you choose are sent to public databases to look them up. Names, dates, and the rest of the report never leave this page.</div>
+
+  <label for="cancer">Type of cancer</label>
+  <select id="cancer"></select>
+  <p class="hint">This decides which drugs are shown as approved for this cancer. Pick "Other or not sure" if unsure.</p>
+
+  <label for="report" style="margin-top:14px">Report text</label>
+  <textarea id="report" placeholder="Paste the report text here, or type the findings, for example: KRAS G12C, TP53 R273H, CDKN2A loss, TMB 12 mut/Mb"></textarea>
+  <div class="row">
+    <span class="file"><button type="button">Upload report PDF</button><input type="file" id="pdf" accept="application/pdf"></span>
+    <button class="primary" id="go">Explain my report</button>
+    <button id="sample">Try a sample report</button>
+    <button id="clear">Clear</button>
+  </div>
+  <p class="hint">PDF upload works for reports saved as digital PDFs (most patient portals). It can't read photos or scans; for those, type the findings in.</p>
+  <div class="status" id="status" aria-live="polite"></div>
+
+  <section id="out" hidden>
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">What the report shows</h2>
+      <label class="switch"><input type="checkbox" id="techToggle"> Show technical detail</label>
+    </div>
+    <div class="tiles" id="tiles"></div>
+    <div id="inherited"></div>
+    <div id="biomarkers"></div>
+    <div id="findings"></div>
+    <div id="notParsed"></div>
+
+    <h2>Questions to ask the doctor</h2>
+    <div class="card"><ul class="clean" id="questions"></ul></div>
+
+    <h2>Get a plain-language summary from AI</h2>
+    <div class="card">
+      <p style="margin-top:0">Download a report of these findings to upload to (or paste into) the AI assistant you use, such as ChatGPT, Claude, Gemini, or Copilot. It contains only the findings and drug information shown here, not your original report, names, or dates.</p>
+      <div class="row"><button class="primary" id="dl">Download report for AI</button><button id="copy">Copy report</button></div>
+      <p class="hint" id="reportNote"></p>
+    </div>
+
+    <h2>Words you'll see</h2>
+    <dl class="card gloss">
+      <dt>Gene</dt><dd>A set of instructions in DNA for making one protein. Cancer happens when changes in a few key genes make cells grow out of control.</dd>
+      <dt>Mutation, variant, alteration</dt><dd>A change in a gene. Reports use these words to mean much the same thing.</dd>
+      <dt>Targeted therapy</dt><dd>A drug designed to act on a specific change, such as one gene stuck in the "on" position.</dd>
+      <dt>Variant of unknown significance (VUS)</dt><dd>A change that scientists don't yet understand. It usually isn't used to choose treatment, and many turn out to be harmless.</dd>
+      <dt>Tumor mutational burden (TMB)</dt><dd>How many gene changes the tumor has. A high count (often 10 or more per megabase) can mean immunotherapy is more likely to help.</dd>
+      <dt>Microsatellite instability (MSI)</dt><dd>A sign that the tumor's DNA spell-checker is broken. MSI-High tumors often respond to immunotherapy.</dd>
+      <dt>Variant allele fraction (VAF)</dt><dd>The share of DNA in the sample that carries the change. Around 50% or 100% can sometimes hint that a change was inherited, though tumor tests can't say for sure.</dd>
+      <dt>Somatic vs. germline (inherited)</dt><dd>Somatic changes arose in the tumor and aren't passed to family. Germline changes are in every cell from birth and can be shared with relatives.</dd>
+    </dl>
+  </section>
+
+  <footer>
+    <p><strong>This is not medical advice.</strong> It explains what a report's findings generally mean and what's publicly known about them. Treatment choices depend on the whole picture, which only the care team has. Bring these results and your questions to them.</p>
+    <p><strong>Where the information comes from.</strong> Gene explanations are written for this tool. Drug matches come from FDA drug labels via openFDA, trials from ClinicalTrials.gov, and research evidence (technical view) from CIViC, an open cancer-variant database. Findings are read from the report automatically and can be missed or misread, so check them against the report itself.</p>
+    <p><strong>Privacy.</strong> The report is processed in your browser. Only gene and change names and the cancer type are sent to openFDA, ClinicalTrials.gov, and CIViC. Nothing is stored. Not affiliated with any testing lab, the FDA, or any drug maker.</p>
+    <p>Open source under the MIT License. Built by Aneel Paulus, MD, MS.</p>
+  </footer>
+</main>
+
+<script>
+/* ---------- Pure helpers (no network, testable) ---------- */
+// Plain-English summaries of what each gene normally does, written for this tool.
+const GENES = {
+  KRAS: "A switch that tells cells when to grow and divide. Certain changes can lock it in the 'on' position.",
+  NRAS: "A growth switch closely related to KRAS. Changes can lock it 'on'.",
+  HRAS: "A growth switch related to KRAS. Changes can lock it 'on'.",
+  BRAF: "A relay in the same growth-signal chain as KRAS. Changes such as V600E keep sending 'grow' signals.",
+  MAP2K1: "Also called MEK1, a relay just after BRAF in the growth-signal chain.",
+  EGFR: "A receiver on the cell surface that picks up growth signals. Some changes keep it switched on without a signal.",
+  ERBB2: "Also called HER2, a growth-signal receiver related to EGFR. Extra copies or certain changes can drive growth.",
+  ERBB3: "Also called HER3, a growth-signal receiver that partners with HER2.",
+  ALK: "A growth-signal gene that, in cancer, is usually broken and fused to another gene, leaving it permanently on.",
+  ROS1: "A growth-signal gene that, in cancer, is usually fused to another gene, leaving it permanently on.",
+  RET: "A growth-signal gene. Fusions or certain changes can switch it on permanently.",
+  NTRK1: "A nerve-growth signal gene. In cancer it can be fused to another gene and switched on permanently.",
+  NTRK2: "A nerve-growth signal gene. In cancer it can be fused to another gene and switched on permanently.",
+  NTRK3: "A nerve-growth signal gene. In cancer it can be fused to another gene and switched on permanently.",
+  MET: "A growth-signal receiver. Skipping part of the gene (exon 14) or extra copies can over-activate it.",
+  FGFR1: "A growth-factor receiver. Extra copies or fusions can over-activate it.",
+  FGFR2: "A growth-factor receiver. Fusions and certain changes can over-activate it.",
+  FGFR3: "A growth-factor receiver. Certain changes and fusions can over-activate it, notably in bladder cancer.",
+  NRG1: "A gene for a growth signal. In cancer it can be fused to another gene.",
+  PIK3CA: "Part of a growth and survival pathway (PI3K). Changes keep the pathway switched on.",
+  AKT1: "A relay in the PI3K growth and survival pathway.",
+  PTEN: "A brake on the PI3K growth pathway. Losing it removes the brake.",
+  MTOR: "A central controller of cell growth in the PI3K pathway.",
+  TSC1: "A brake on the mTOR growth pathway.",
+  TSC2: "A brake on the mTOR growth pathway.",
+  TP53: "Often called the 'guardian of the genome.' It stops damaged cells from dividing. It's the most commonly changed gene in cancer, and there's no approved drug that targets it directly yet.",
+  CDKN2A: "A brake on cell division. Losing it lets cells divide more freely.",
+  CDKN2B: "A brake on cell division, next to CDKN2A and often lost along with it.",
+  CDK4: "A driver of cell division. Extra copies can push cells to divide.",
+  CDK6: "A driver of cell division, related to CDK4.",
+  RB1: "A brake on cell division.",
+  MYC: "A master switch for cell growth. Extra copies are common in many cancers.",
+  MDM2: "A protein that switches off TP53. Extra copies can disable TP53 indirectly.",
+  BRCA1: "Helps repair broken DNA. When it doesn't work, some treatments (such as PARP inhibitors and platinum chemotherapy) can work better.",
+  BRCA2: "Helps repair broken DNA. When it doesn't work, some treatments (such as PARP inhibitors and platinum chemotherapy) can work better.",
+  PALB2: "Works with BRCA2 to repair broken DNA.",
+  ATM: "Senses DNA damage and calls in repairs.",
+  CHEK2: "Part of the DNA damage alarm system.",
+  RAD51C: "Helps repair broken DNA, working with BRCA1 and BRCA2.",
+  RAD51D: "Helps repair broken DNA, working with BRCA1 and BRCA2.",
+  BRIP1: "Helps repair DNA, working with BRCA1.",
+  BARD1: "Partners with BRCA1 to repair DNA.",
+  CDK12: "Helps keep DNA repair genes working; changes are seen in some prostate and ovarian cancers.",
+  MLH1: "Part of the DNA 'spell-checker' (mismatch repair). If it fails, tumors can become MSI-High.",
+  MSH2: "Part of the DNA 'spell-checker' (mismatch repair). If it fails, tumors can become MSI-High.",
+  MSH6: "Part of the DNA 'spell-checker' (mismatch repair). If it fails, tumors can become MSI-High.",
+  PMS2: "Part of the DNA 'spell-checker' (mismatch repair). If it fails, tumors can become MSI-High.",
+  EPCAM: "A gene next to MSH2; some changes switch MSH2 off.",
+  POLE: "Copies DNA when cells divide. Some changes cause very many mutations, which can make immunotherapy more effective.",
+  APC: "A brake on growth in the lining of the colon. Losing it is an early step in most colon cancers.",
+  CTNNB1: "Makes beta-catenin, a growth signal that APC normally keeps in check.",
+  SMAD4: "Carries growth-control signals into the cell's center. Often lost in pancreatic and colon cancers.",
+  STK11: "A brake on cell growth and metabolism. In lung cancer, losing it may make immunotherapy less effective.",
+  KEAP1: "Controls the cell's stress-defense system. Changes are common in lung cancer.",
+  NF1: "A brake on the RAS growth switch. Losing it lets RAS stay on.",
+  NF2: "A brake on cell growth involved in how cells stick together.",
+  IDH1: "A metabolism enzyme. Certain changes make it produce an abnormal substance that drives cancer.",
+  IDH2: "A metabolism enzyme related to IDH1. Certain changes drive cancer.",
+  ESR1: "The gene for the estrogen receptor. Changes can make breast cancer resistant to some hormone treatments.",
+  AR: "The gene for the androgen (male hormone) receptor, important in prostate cancer.",
+  KIT: "A growth-signal receiver. Changes drive most gastrointestinal stromal tumors (GIST).",
+  PDGFRA: "A growth-signal receiver related to KIT. Changes drive some GISTs.",
+  FLT3: "A growth-signal receiver on blood-forming cells. Changes are common in acute myeloid leukemia.",
+  NPM1: "A protein-handling gene often changed in acute myeloid leukemia.",
+  DNMT3A: "Controls which genes are switched on in blood cells.",
+  TET2: "Controls which genes are switched on in blood cells.",
+  ASXL1: "Controls which genes are switched on in blood cells.",
+  JAK2: "A growth-signal relay in blood cells.",
+  ARID1A: "Helps package DNA and control which genes are read.",
+  VHL: "Helps cells sense oxygen levels. Losing it drives most kidney cancers.",
+  BAP1: "A brake on cell growth involved in DNA repair.",
+  NOTCH1: "Controls how cells mature and specialize.",
+  CDH1: "Helps cells stick together. Losing it is common in some stomach and breast cancers.",
+  SF3B1: "Helps edit genetic messages before proteins are made.",
+  SPOP: "Helps clear old proteins, often changed in prostate cancer.",
+  GNAQ: "A signal relay, often changed in melanoma of the eye.",
+  GNA11: "A signal relay, often changed in melanoma of the eye.",
+  ATRX: "Helps package DNA and protect chromosome ends.",
+  TERT: "Keeps chromosome ends from wearing down, letting cells keep dividing.",
+  PBRM1: "Helps package DNA; often lost in kidney cancer.",
+  KMT2D: "Controls which genes are switched on.",
+  RNF43: "A brake on a growth signal in the gut lining."
+};
+// Genes whose fusions drive cancer and carry the drug approvals ("EML4-ALK" is an ALK fusion).
+const FUSION_DRIVERS = new Set(["ALK", "ROS1", "RET", "NTRK1", "NTRK2", "NTRK3", "FGFR1", "FGFR2", "FGFR3", "NRG1", "BRAF", "RAF1", "MET", "EGFR", "NUTM1", "PDGFRA", "PDGFRB", "ABL1", "JAK2", "RARA", "KMT2A"]);
+const ALIASES = { HER2: "ERBB2", HER3: "ERBB3", MEK1: "MAP2K1" };
+// Genes on the major commercial panels (Tempus xT, FoundationOne CDx, OmniSeq INSIGHT). Findings in these genes are recognized
+// even without a plain-English description; the explanation then relies on the type of change.
+const PANEL_GENES = "ABCB1 ABCC3 ABL1 ABL2 ABRAXAS1 ACTA2 ACVR1 ACVR1B AGO1 AJUBA AKT1 AKT2 AKT3 ALK ALOX12B AMER1 APC APLNR APOB AR ARAF ARFRP1 ARHGAP26 ARHGAP35 ARID1A ARID1B ARID2 ARID5B ASNS ASPSCR1 ASXL1 ATIC ATM ATP7B ATR ATRX AURKA AURKB AXIN1 AXIN2 AXL B2M BAP1 BARD1 BCL10 BCL11B BCL2 BCL2L1 BCL2L11 BCL2L2 BCL6 BCL7A BCLAF1 BCOR BCORL1 BCR BIRC3 BLM BMPR1A BRAF BRCA1 BRCA2 BRD4 BRIP1 BTG1 BTG2 BTK BUB1B CALR CARD11 CARM1 CASP8 CASR CBFB CBL CBLB CBLC CBR3 CCDC6 CCND1 CCND2 CCND3 CCNE1 CD19 CD22 CD274 CD40 CD70 CD79A CD79B CDC73 CDH1 CDK12 CDK4 CDK6 CDK8 CDKN1A CDKN1B CDKN1C CDKN2A CDKN2B CDKN2C CEBPA CEP57 CFTR CHD2 CHD4 CHD7 CHEK1 CHEK2 CIC CIITA CKS1B CREBBP CRKL CRLF2 CSF1R CSF3R CTC1 CTCF CTLA4 CTNNA1 CTNNB1 CTRC CUL1 CUL3 CUL4A CUL4B CUX1 CXCR4 CYLD CYP17A1 CYP1B1 CYP2D6 CYP3A5 CYSLTR2 DAXX DDB2 DDR1 DDR2 DDX3X DICER1 DIRC2 DIS3 DIS3L2 DKC1 DNM2 DNMT3A DOT1L DPYD DYNC2H1 EBF1 ECT2L EED EGF EGFR EGLN1 EIF1AX ELF3 ELOC EMSY ENG EP300 EPCAM EPHA2 EPHA3 EPHA7 EPHB1 EPHB2 EPHB4 EPOR ERBB2 ERBB3 ERBB4 ERCC1 ERCC2 ERCC3 ERCC4 ERCC5 ERCC6 ERG ERRFI1 ESR1 ETS1 ETS2 ETV1 ETV4 ETV5 ETV6 EWSR1 EZH2 FAM46C FANCA FANCB FANCC FANCD2 FANCE FANCF FANCG FANCI FANCL FANCM FAS FAT1 FBXO11 FBXW7 FCGR2A FCGR3A FDPS FGF1 FGF10 FGF14 FGF19 FGF2 FGF23 FGF3 FGF4 FGF5 FGF6 FGF7 FGF8 FGF9 FGFR1 FGFR2 FGFR3 FGFR4 FH FHIT FLCN FLT1 FLT3 FLT4 FNTB FOXA1 FOXL2 FOXO1 FOXO3 FOXP1 FOXQ1 FRS2 FUBP1 FUS G6PD GABRA6 GALNT12 GATA1 GATA2 GATA3 GATA4 GATA6 GEN1 GID4 GLI1 GLI2 GNA11 GNA13 GNAQ GNAS GPC3 GPS2 GREM1 GRIN2A GRM3 GSTP1 H3F3A HAS3 HAVCR2 HDAC1 HDAC2 HDAC4 HGF HIF1A HIST1H1E HIST1H3B HIST1H4E HNF1A HNF1B HOXA11 HOXB13 HRAS HSD11B2 HSD3B1 HSD3B2 HSP90AA1 HSPH1 IDH1 IDH2 IDO1 IFIT1 IFIT2 IFIT3 IFNAR1 IFNAR2 IFNGR1 IFNGR2 IFNL3 IKBKE IKZF1 IL10RA IL15 IL2RA IL6R IL7R ING1 INPP4B IRF1 IRF2 IRF4 IRS2 ITPKB JAK1 JAK2 JAK3 JUN KAT6A KDM5A KDM5C KDM5D KDM6A KDR KEAP1 KEL KIF1B KIT KLF4 KLHL6 KLLN KMT2A KMT2B KMT2C KMT2D KRAS L2HGDH LAG3 LATS1 LCK LDLR LEF1 LMNA LMO1 LRP1B LTK LYN LZTR1 MAD2L2 MAF MAFB MAGI2 MALT1 MAP2K1 MAP2K2 MAP2K4 MAP3K1 MAP3K13 MAP3K7 MAPK1 MAX MC1R MCL1 MDM2 MDM4 MED12 MEF2B MEN1 MERTK MET MGMT MIB1 MITF MKI67 MKNK1 MLH1 MLH3 MLLT3 MN1 MPL MRE11 MS4A1 MSH2 MSH3 MSH6 MST1R MTAP MTHFD2 MTHFR MTOR MTRR MUTYH MYB MYC MYCL MYCN MYD88 MYH11 NBN NCOR1 NCOR2 NF1 NF2 NFE2L2 NFKBIA NHP2 NKX2-1 NOP10 NOTCH1 NOTCH2 NOTCH3 NOTCH4 NPM1 NQO1 NRAS NRG1 NSD1 NSD2 NSD3 NT5C2 NTHL1 NTRK1 NTRK2 NTRK3 NUDT15 NUP98 OLIG2 P2RY8 PAK1 PALB2 PALLD PARP1 PARP2 PARP3 PAX3 PAX5 PAX7 PAX8 PBRM1 PCBP1 PDCD1 PDCD1LG2 PDGFRA PDGFRB PDK1 PHF6 PHGDH PHLPP1 PHLPP2 PHOX2B PIAS4 PIK3C2B PIK3C2G PIK3CA PIK3CB PIK3CD PIK3CG PIK3R1 PIK3R2 PIM1 PLCG1 PLCG2 PML PMS1 PMS2 POLD1 POLE POLH POLQ POT1 POU2F2 PPARA PPARD PPARG PPM1D PPP1R15A PPP2R1A PPP2R2A PPP6C PRCC PRDM1 PREX2 PRKAR1A PRKDC PRKN PRSS1 PTCH1 PTCH2 PTEN PTPN11 PTPN13 PTPN22 PTPRD PTPRT QKI RAC1 RAD21 RAD50 RAD51 RAD51B RAD51C RAD51D RAD54L RAF1 RANBP2 RARA RASA1 RB1 RBM10 RECQL4 RET RHEB RHOA RICTOR RINT1 RIT1 RNF139 RNF43 ROS1 RPL5 RPS15 RPS6KB1 RPTOR RRM1 RSF1 RUNX1 RUNX1T1 RXRA SCG5 SDHA SDHAF2 SDHB SDHC SDHD SEC23B SEMA3C SETBP1 SETD2 SF3B1 SGK1 SH2B3 SHH SLC26A3 SLC47A2 SLC9A3R1 SLIT2 SLX4 SMAD2 SMAD3 SMAD4 SMARCA1 SMARCA4 SMARCB1 SMARCE1 SMC1A SMC3 SMO SOCS1 SOD2 SOX10 SOX2 SOX9 SPEN SPINK1 SPOP SPRED1 SRC SRSF2 STAG2 STAT3 STAT4 STAT5A STAT5B STAT6 STK11 SUFU SUZ12 SYK SYNE1 TAF1 TANC1 TAP1 TAP2 TARBP2 TBC1D12 TBL1XR1 TBX3 TCF3 TCF7L2 TCL1A TERT TET2 TFE3 TFEB TFEC TGFBR1 TGFBR2 TIGIT TMEM127 TMEM173 TMPRSS2 TNF TNFAIP3 TNFRSF14 TNFRSF17 TNFRSF9 TOP1 TOP2A TP53 TP63 TPM1 TPMT TRAF3 TRAF7 TSC1 TSC2 TSHR TUSC3 TYMS U2AF1 UBE2T UGT1A1 UGT1A9 UMPS VEGFA VEGFB VHL VSIR WEE1 WNK1 WNK2 WRN WT1 XPA XPC XPO1 XRCC1 XRCC2 XRCC3 YEATS4 ZFHX3 ZMYM3 ZNF217 ZNF471 ZNF620 ZNF750 ZNRF3 ZRSR2 ADGRA2 ANKRD11 ANKRD26 ASXL2 BBC3 CCN6 CD276 CD74 CENPA COP1 CSNK1A1 DCUN1D1 DDX41 DHX15 DNAJB1 DNMT1 DNMT3B E2F3 EGFL7 EIF4A2 EIF4E EML4 EPHA5 FLI1 FYN GSK3B H1-2 H2BC5 H3-3A H3-3B H3-4 H3-5 H3C1 H3C10 H3C11 H3C12 H3C13 H3C14 H3C15 H3C2 H3C3 H3C4 H3C6 H3C7 H3C8 HNRNPK ICOSLG ID3 IGF1 IGF1R IGF2 IL10 INHA INHBA INPP4A INSR IRS1 KIF5B LAMP1 LATS2 MAP3K14 MAP3K4 MAPK3 MDC1 MGA MST1 MYOD1 NAB2 NCOA3 NEGR1 NKX3-1 NUP93 NUTM1 PAK3 PAK5 PDPK1 PGR PIK3C3 PIK3R3 PLK2 PMAIP1 PNRC1 PRKCI PRSS8 PTPRS RAB35 RAD52 REL RPS6KA4 RPS6KB2 RYBP SH2D1A SHQ1 SMARCD1 SNCAIP SOX17 SPTA1 STAG1 STK40 TENT5C TERC TET1 TFRC TRAF2 VTCN1 XIAP YAP1 YES1 ZBTB2 ZBTB7A ZNF703 HIST1H2BD".split(" ");
+// Hereditary cancer genes. Strong: commonly inherited. Possible: usually tumor-only, sometimes inherited.
+const HEREDITARY_STRONG = new Set(["BRCA1", "BRCA2", "PALB2", "MLH1", "MSH2", "MSH6", "PMS2", "EPCAM", "RAD51C", "RAD51D", "BRIP1", "BARD1", "CHEK2", "ATM", "CDH1", "APC", "BAP1", "VHL"]);
+const HEREDITARY_POSSIBLE = new Set(["TP53", "PTEN", "STK11", "NF1", "CDKN2A", "RET", "POLE", "MUTYH"]);
+
+const AA = { Ala: "A", Arg: "R", Asn: "N", Asp: "D", Cys: "C", Gln: "Q", Glu: "E", Gly: "G", His: "H", Ile: "I", Leu: "L", Lys: "K", Met: "M", Phe: "F", Pro: "P", Ser: "S", Thr: "T", Trp: "W", Tyr: "Y", Val: "V", Ter: "*" };
+const AA_NAME = { A: "alanine", R: "arginine", N: "asparagine", D: "aspartic acid", C: "cysteine", Q: "glutamine", E: "glutamic acid", G: "glycine", H: "histidine", I: "isoleucine", L: "leucine", K: "lysine", M: "methionine", F: "phenylalanine", P: "proline", S: "serine", T: "threonine", W: "tryptophan", Y: "tyrosine", V: "valine" };
+
+function one(x) { return AA[x] || x; }
+function normalize(t) {
+  return String(t || "").replace(/\r/g, "").replace(/[‐-―−]/g, "-").replace(/ /g, " ").replace(/[ \t]+/g, " ")
+    // PDF ligatures: the "fi" ligature can arrive as one character or drop out entirely ("Amplied").
+    .replace(/\uFB01/g, "fi").replace(/\uFB02/g, "fl").replace(/\bAmplied\b/g, "Amplified")
+    // Scanned reports read by text recognition can print a lowercase L for 1 ("Hl047R").
+    .replace(/(?<![A-Za-z0-9])([A-Z])l(\d{2,4}[A-Z*])(?![A-Za-z0-9])/g, "$11$2");
+}
+
+const GENE_RE = new RegExp("(?<![A-Za-z0-9])(?<!anti-)(" + [...new Set(Object.keys(GENES).concat(Object.keys(ALIASES), PANEL_GENES))].sort((a, b) => b.length - a.length).join("|") + ")(?![A-Za-z0-9])", "g");
+const PROT = /^[\s:,(-]{0,6}(?:(?:p\.)|(?:[A-Za-z0-9 ,]{0,60}?\|\s*p\.)|(?:[A-Za-z0-9 ,.>_+*-]{0,40}?\bp\.))?\(?((?:[A-Z][a-z]{2}|[A-Z])(\d{1,4})(?:_(?:[A-Z][a-z]{2}|[A-Z])\d{1,4})?(?:fs\*?\d*|\*|Ter|X\b|del(?:ins(?:(?:[A-Z][a-z]{2})+|[A-Z]+))?|ins(?:(?:[A-Z][a-z]{2})+|[A-Z]+)|dup|[A-Z][a-z]{2}|[A-Z]))\)?(?![A-Za-z0-9])/;
+
+// Turn "Gly12Cys" into "G12C", "Arg175Ter" into "R175*".
+function toOneLetter(p) {
+  return p.replace(/^([A-Z][a-z]{2})(\d+)/, (m, a, n) => one(a) + n).replace(/_([A-Z][a-z]{2})(\d+)/, (m, a, n) => "_" + one(a) + n)
+    .replace(/ins((?:[A-Z][a-z]{2})+)$/, (m, q) => "ins" + q.match(/[A-Z][a-z]{2}/g).map(one).join(""))
+    .replace(/([A-Z][a-z]{2})$/, (m, a) => one(a)).replace(/Ter$/, "*").replace(/X$/, "*");
+}
+
+// Which exon a protein change falls in, for genes where approvals are written by exon.
+const EXON_MAP = {
+  EGFR: [[18, 688, 728], [19, 729, 761], [20, 762, 823], [21, 824, 875]],
+  ERBB2: [[19, 729, 769], [20, 770, 831]],
+  KIT: [[9, 449, 514], [11, 550, 591], [13, 627, 664], [17, 788, 828]],
+  PDGFRA: [[12, 552, 596], [14, 631, 666], [18, 814, 854]]
+};
+function exonOf(gene, alt) {
+  const ex = String(alt).match(/^exon (\d+)/);
+  if (ex) return +ex[1];
+  const m = String(alt).match(/^[A-Z](\d+)/);
+  const map = EXON_MAP[gene];
+  if (!m || !map) return null;
+  const pos = +m[1];
+  const hit = map.find(([, a, b]) => pos >= a && pos <= b);
+  return hit ? hit[0] : null;
+}
+
+function classify(alt) {
+  if (/fusion|rearrangement/i.test(alt)) return "fusion";
+  if (/amplification/i.test(alt)) return "amp";
+  if (/loss|deletion$/i.test(alt) && !/exon/i.test(alt)) return "loss";
+  if (/exon/i.test(alt)) return "exon";
+  if (/splice/i.test(alt)) return "splice";
+  if (/fs/.test(alt)) return "frameshift";
+  if (/\*$/.test(alt)) return "nonsense";
+  if (/del|ins|dup|ITD/.test(alt)) return "indel";
+  if (/^[A-Z]\d+[A-Z]$/.test(alt)) return "missense";
+  return "other";
+}
+
+// Find gene changes in report text. Returns [{gene, alt, kind, vaf, vus, germlineNote, at}]
+// Section headings. Text under a DROP heading (test descriptions, gene lists, drug write-ups, trial titles,
+// references, lab interpretation pages) is ignored until a KEEP heading or the next PDF page.
+const SP = "\\s*";
+const head = words => new RegExp("^(?:\\d+\\s+)?(?:" + words.map(w => w.split(" ").join(SP)).join("|") + ")", "i");
+const KEEP_HEAD = head(["genomic variants", "genomic findings", "biomarker findings", "genomic alterations", "other alterations", "alterations detected", "detected alterations", "somatic", "germline -", "germline variant", "variants of (?:unknown|uncertain)", "immunotherapy markers", "companion diagnostic \\(CDx\\) associated findings", "summary of (?:findings|alterations)", "variant details", "potential germline"]);
+const DROP_HEAD = head(["intended use", "test principle", "table 1", "companion diagnostic indications", "potential treatment strategies", "assay findings association", "assay description", "about the test", "gene list", "dna gene list", "rna gene list", "genes assayed", "references", "clinical trials", "clinical history", "interpretations for the guardant", "guideline/fda recommended", "synonymous alterations", "pharmacogenomics", "methodology", "methods", "limitations", "disclaimer", "pertinent negative", "low coverage regions", "therapies with clinical", "frequently asked", "glossary"]);
+const DROP_ANYWHERE = new RegExp(["companion diagnostic indications", "intended use", "test principle", "potential treatment strategies", "assay findings association", "assay description", "interpretations for the guardant", "guideline/fda recommended actionable", "genes assayed in"].map(w => w.split(" ").join(SP)).join("|"), "i");
+// Caris tables print a wrapped gene name ("ERBB2 (Her2/Neu)") on the line between its result rows, and put
+// method and analyte columns ("CNA-Seq DNA-Tumor") between the gene and the result. Rejoin and strip them.
+const CARIS_METHOD = /^(?:Seq|CNA-Seq|CNA-NGS|NGS|CISH|FISH|IHC|WTS)\s+(?:DNA|RNA|Protein)/;
+function carisLines(lines) {
+  const ls = lines.map(l => l.replace(/\s*\(Her2\/\s*Neu\)/gi, "").replace(/^\(Her2\/\s*/i, "")).filter(l => !/^\s*Neu\)\s*$/i.test(l));
+  const geneOnly = ls.map(l => { const t = l.trim(); const m = t.match(new RegExp("^" + GENE_RE.source + "$")); return m ? m[1] : null; });
+  return ls.map((l, i) => {
+    let t = l.trim();
+    if (CARIS_METHOD.test(t)) {
+      for (const d of [1, -1, 2, -2]) { if (geneOnly[i + d]) { t = geneOnly[i + d] + " " + t; break; } }
+    }
+    return t.replace(/\b(?:Seq|CNA-Seq|CNA-NGS|NGS|CISH|FISH|IHC|WTS)\s+(?:DNA-Tumor|RNA-Tumor|DNA-Normal|Protein)\b\s*/g, "").replace(/\b(?:DNA|RNA)-Tumor\b\s*/g, "")
+      // The variant frequency column follows the DNA change with no % sign ("c.2686C>T 89").
+      .replace(/(\bc\.\d+(?:\s?_\s?\d+)?[A-Za-z0-9>_+*-]*)\s+(\d{1,3}(?:\.\d+)?)(?=\s|$)/g, "$1 VAF $2%");
+  });
+}
+function reportBody(raw) {
+  // Collapse letter-spaced headings ("G E N O M I C") so headings can be recognized.
+  let lines = normalize(raw).split("\n").map(l => l.replace(/(?:(?<![A-Za-z])[A-Z] ){3,}[A-Z](?![A-Za-z])/g, m => m.replace(/ /g, "")));
+  if (/Caris Life Sciences|carismolecularintelligence|Caris MPI/i.test(raw)) lines = carisLines(lines);
+  const geneC = new RegExp("^(" + GENE_RE.source + ")\\s+(c\\.\\S+.*)$");
+  for (let i = 0; i + 1 < lines.length; i++) {
+    const a = lines[i].trim().match(geneC), b = lines[i + 1].trim().match(/^(p\.[A-Za-z0-9_*]+)\s*(.*)$/);
+    if (a && b && !/\bp\./.test(a[3])) { lines[i] = `${a[1]} ${b[1]} ${a[3]}`; lines[i + 1] = b[2]; }
+  }
+  // In a PDF, pages of literature write-ups (FoundationOne's gene and drug detail pages) only restate the
+  // findings already listed in the summary, so the whole page is skipped.
+  const PAGE_DROP = new RegExp(["potential treatment strategies", "assay findings association", "finding summary"].map(w => w.split(" ").join(SP)).join("|"), "i");
+  const pages = []; let cur = [];
+  for (const line of lines) { if (/^\[Page \d+\]$/.test(line.trim())) { pages.push(cur); cur = [line]; } else cur.push(line); }
+  pages.push(cur);
+  const hasPages = pages.length > 2;
+  const kept = hasPages ? pages.filter(pg => !PAGE_DROP.test(pg.join(" "))).flat() : lines;
+  let keep = true; const out = [];
+  for (const line of kept) {
+    const t = line.trim();
+    if (/^\[Page \d+\]$/.test(t)) { keep = true; out.push(t); continue; }
+    if (KEEP_HEAD.test(t)) keep = true;
+    else if (DROP_HEAD.test(t) || DROP_ANYWHERE.test(t)) keep = false;
+    if (keep) out.push(line);
+  }
+  return out.join("\n");
+}
+
+function parseFindings(raw) {
+  const text = reportBody(raw);
+  const vusRanges = [];
+  const vusHead = /variants?\s*of\s*(?:unknown|uncertain|undetermined)\s*(?:clinical\s*)?significance|\bVUS(?:es)?\b(?=\s*[\n:])/gi;
+  let m;
+  while ((m = vusHead.exec(text))) {
+    const rest = text.slice(m.index + m[0].length);
+    const next = rest.search(/\n\s*(?:genomic\s*(?:findings|variants)|biomarker\s*findings|therapies|therapy|clinical\s*trials?|appendix|references|methods|interpretation|about\s*the\s*test|disease[- ]relevant|genes\s*assayed|low\s*coverage|variant\s*details|somatic\s*variant|germline|\[Page)/i);
+    vusRanges.push([m.index, next < 0 ? text.length : m.index + m[0].length + next]);
+  }
+  // Sections listing changes found in normal (blood or saliva) DNA, which are likely inherited.
+  const germRanges = [], maybeGermRanges = [];
+  const germHead = /^.*germline.*(?:pathogenic|variant|finding).*$/gim;
+  while ((m = germHead.exec(text))) {
+    if (/\bno\b[^\n]*germline|germline[^\n]*\b(?:not|none)\b|not a validated germline/i.test(m[0])) continue;
+    const rest = text.slice(m.index + m[0].length);
+    const next = rest.search(/\n(?:\[Page|.*(?:somatic|immunotherapy\s*markers|variants\s*of|biomarker|therap|clinical\s*trials|pertinent\s*negatives))/i);
+    // "Potential germline variants" boxes flag changes worth germline testing; they were not found in normal DNA.
+    (/potential|possible|suspected|may represent|consider/i.test(m[0]) ? maybeGermRanges : germRanges).push([m.index, next < 0 ? text.length : m.index + m[0].length + next]);
+  }
+  // Lists of changes the lab says may come from clonal hematopoiesis (age-related changes in blood cells), not the tumor.
+  const chText = [...normalize(raw).matchAll(/clonal\s+hematopoiesis[^:]{0,120}:([^\n]{0,160}(?:\n[^\n]{0,160})?)/gi)].map(x => x[1]).join(" ");
+  const out = new Map();
+  GENE_RE.lastIndex = 0;
+  while ((m = GENE_RE.exec(text))) {
+    let gene = ALIASES[m[1]] || m[1];
+    const end = m.index + m[0].length;
+    let win = text.slice(end, end + 90);
+    const nextGene = win.slice(1).search(new RegExp(GENE_RE.source));
+    if (nextGene > 0) win = win.slice(0, nextGene + 1);
+    if (gene === "CDKN2A" && /^\/B/.test(win)) win = win.slice(2);
+    const lineEnd = win.indexOf("\n");
+    const sameLine = lineEnd >= 0 ? win.slice(0, lineEnd) : win;
+    let alt = null;
+    // Hotspot tables (Oncomine) list every variant tested with a result column. Read the rest of this row,
+    // up to the next different gene, and skip it if the result is negative or not called.
+    const lineStop = text.indexOf("\n", end);
+    let rowRest = text.slice(end, lineStop < 0 ? text.length : lineStop);
+    const other = [...rowRest.matchAll(new RegExp(GENE_RE.source, "g"))].find(x => (ALIASES[x[1]] || x[1]) !== gene);
+    if (other) rowRest = rowRest.slice(0, other.index);
+    if (/\b(?:NEGATIVE|ABSENT|NO CALL|NOT DETECTED|WILD[- ]TYPE)\b/.test(rowRest)) continue;
+    if (/^\W{0,6}(not detected|negative|wild[- ]?type|no (?:reportable )?(?:alterations?|mutations?)|none detected|normal)\b/i.test(sameLine)) continue;
+    if (/\b(not detected|none detected|negative for|wild[- ]?type|no (?:reportable )?(?:alterations?|mutations?) (?:detected|found|identified))\b/i.test(sameLine.slice(0, 45))) continue;
+    let x;
+    if ((x = sameLine.match(/^[\s:-]{0,4}(?:[-:\/]{1,2}\s?[A-Z0-9]{2,10}\s+)?(fusion|rearrangement|translocation)\b/i)) || (x = text.slice(Math.max(0, m.index - 14), m.index).match(/[A-Z0-9]{2,10}(?:-|::|\/)$/) && sameLine.match(/^\s*(fusion|rearrangement)/i))) alt = "fusion";
+    else if (/^[\s:-]{0,4}(?:\([^)]{0,20}\)\s*)?(?:amplification|amplified|\bamp\b|copy number gain|gain\b)/i.test(sameLine)) alt = "amplification";
+    else if (/^[\s:-]{0,4}(?:homozygous )?(?:loss|deletion\b|deleted|copy number loss)/i.test(sameLine) && !/exon/i.test(sameLine.slice(0, 20))) alt = "loss";
+    else if ((x = sameLine.match(/^[^\n]{0,30}?exon\s?(\d{1,2})\s*(deletion|del|insertion|ins|skipping|splice|duplication|alteration|mutation)/i))) {
+      // A MET exon 14 splice-site change causes exon 14 skipping, the change the MET drugs are approved for.
+      if (/splice/i.test(x[2])) alt = gene === "MET" && x[1] === "14" ? "exon 14 skipping" : "splice site change";
+      else alt = `exon ${x[1]} ${/del/i.test(x[2]) ? "deletion" : /ins/i.test(x[2]) ? "insertion" : /skip/i.test(x[2]) ? "skipping" : x[2].toLowerCase()}`;
+    }
+    else if (/^[\s:-]{0,4}(?:-\s?)?(?:ITD\b|internal tandem duplication)/i.test(sameLine)) alt = "internal tandem duplication (ITD)";
+    else if ((x = sameLine.match(PROT))) alt = toOneLetter(x[1]);
+    else if (/^[\s:-]{0,4}(?:[A-Za-z ]{0,20})?(?:splice|c\.\d+[+-]\d+)/i.test(sameLine)) alt = "splice site change";
+    if (!alt) continue;
+    if (alt === "fusion") {
+      const partner = (sameLine.match(/^[-:\/]{1,2}\s?([A-Z][A-Z0-9-]{1,9})\b/) || text.slice(Math.max(0, m.index - 14), m.index).match(/([A-Z][A-Z0-9]{1,9})(?:-|::|\/)$/) || [])[1];
+      if (partner && FUSION_DRIVERS.has(partner) && !FUSION_DRIVERS.has(gene)) continue;
+    }
+    // A bare one-letter change must look like a real protein change (e.g. not "V2" or "A1C")
+    if (/^[A-Z]\d+[A-Z*]?$/.test(alt) && !/^[A-Z]\d{1,4}(?:[A-Z]|\*|fs)/.test(alt) && classify(alt) === "other") continue;
+    const vafM = sameLine.match(/(?:VAF|allele (?:frequency|fraction)|MAF)[^0-9\n]{0,15}(\d{1,3}(?:\.\d+)?)\s*%/i) || sameLine.match(/(?:^|\s)(\d{1,3}(?:\.\d+)?)\s*%/);
+    const around = text.slice(Math.max(0, m.index - 160), end + 160);
+    const vus = vusRanges.some(([a, b]) => m.index > a && m.index < b) || /\bVUS\b|uncertain significance|unknown significance/i.test(sameLine);
+    const key = gene + " " + alt;
+    const prev = out.get(key);
+    const germline = germRanges.some(([a, b]) => m.index > a && m.index < b) || /\bgermline\b[^\n]{0,40}\b(?:pathogenic|variant)\b/i.test(sameLine);
+    const effect = /\b(?:GOF|gain[- ]of[- ]function)\b/i.test(sameLine) ? "gain" : /\b(?:LOF|loss[- ]of[- ]function)\b/i.test(sameLine) ? "loss" : null;
+    const f = { gene, alt, kind: classify(alt), exon: exonOf(gene, alt), vaf: vafM ? parseFloat(vafM[1]) : null, vus, germline, effect, germlineNote: germline || /germline/i.test(around), germlinePossible: maybeGermRanges.some(([a, b]) => m.index > a && m.index < b), ch: chText.includes(gene + " " + alt) || (!!m[0] && chText.includes(m[0] + " " + alt)), at: m.index };
+    if (!prev) out.set(key, f);
+    else { prev.vaf = prev.vaf ?? f.vaf; prev.vus = prev.vus && f.vus; prev.germline = prev.germline || f.germline; prev.effect = prev.effect || f.effect; prev.germlineNote = prev.germlineNote || f.germlineNote; prev.ch = prev.ch || f.ch; prev.germlinePossible = prev.germlinePossible || f.germlinePossible; }
+  }
+  return [...out.values()].sort((a, b) => a.at - b.at);
+}
+
+// Tumor-wide biomarkers: TMB, MSI, MMR, HRD, PD-L1
+function parseBiomarkers(raw) {
+  // Tempus prints MSI as a scale ("Stable Equivocal High") with the result highlighted, which text can't show.
+  let t = reportBody(raw);
+  const msiScale = /\bstable\s+equivocal\s+high\b/i.test(t);
+  t = t.replace(/\bstable\s+equivocal\s+high\b/gi, " ");
+  const out = [];
+  const NUM = "(?<![≥><=]\\s?)(\\d{1,3}(?:\\.\\d+)?)";
+  const tmb = t.match(new RegExp("(?:tumor mutation(?:al)? burden|\\bTMB\\b)[^0-9]{0,60}?" + NUM + "\\s*(?:muts?|mutations|m)?\\s*\\/\\s*(?:mb|megabase)\\b", "i"))
+    || t.match(new RegExp(NUM + "\\s*(?:muts?|mutations|m)\\s*\\/\\s*mb\\b", "i"))
+    || t.match(new RegExp("(?:tumor mutation(?:al)? burden|\\bTMB\\b)[^0-9\\n]{0,15}" + NUM, "i"));
+  if (tmb) { const v = parseFloat(tmb[1]); out.push({ key: "TMB", value: `${v} mutations per megabase`, high: v >= 10 }); }
+  else if (/\bTMB[- ]?(?:H\b|high)/i.test(t)) out.push({ key: "TMB", value: "High", high: true });
+  // MSI: take the earliest stated result; "MSI-High not detected" means stable.
+  const msi = [];
+  for (const m of t.matchAll(/\bMSI[- ]?H(?:igh)?\b|microsatellite instability[- ]high|microsatellite (?:status|instability)[^.\n]{0,25}\b(?:MSI-H|high)\b/gi)) {
+    const after = t.slice(m.index + m[0].length, m.index + m[0].length + 30);
+    msi.push({ at: m.index, high: !/^\W{0,5}(?:not detected|negative|absent|none)/i.test(after) });
+  }
+  for (const m of t.matchAll(/\bMSS\b|\bMS[- ]stable\b|microsatellite[- ]stable|(?:\bMSI\b|microsatellite (?:status|instability))[^\n]{0,25}\bstable\b/gi)) msi.push({ at: m.index, high: false });
+  msi.sort((a, b) => a.at - b.at);
+  if (msi.length) out.push({ key: "MSI", value: msi[0].high ? "MSI-High" : "Stable (MSS)", high: msi[0].high });
+  else if (msiScale) out.push({ key: "MSI", value: "Shown as a highlighted scale", high: false, unclear: true });
+  const neg = (re) => { const m = t.match(re); return m && !/^\W{0,5}(?:not detected|negative|absent)/i.test(t.slice(m.index + m[0].length, m.index + m[0].length + 25)); };
+  if (neg(/\bdMMR\b|mismatch repair[- ]deficien\w*/i)) out.push({ key: "MMR", value: "Mismatch repair deficient (dMMR)", high: true });
+  if (neg(/homologous recombination deficient\b|\bHRD[- :]*(?:positive|high|detected)\b|\bHRD\+|genomic instability status[^\n.]{0,15}\bdetected\b/i)) out.push({ key: "HRD", value: "Homologous recombination deficient (HRD)", high: true });
+  // PD-L1: the first mention that carries a number (the first mention can be a "CD274 (PD-L1)" gene row).
+  for (const m of t.matchAll(/PD-?L1[^\n]{0,80}/gi)) {
+    const pdLine = m[0].replace(/\([^)]*\)/g, " ").replace(/\b(22C3|SP263|SP142|28-8)\b/gi, " ")
+      .replace(/tumor proportion score/gi, "TPS").replace(/combined positive score/gi, "CPS").replace(/tumor[- ]infiltrating immune cells?|immune cells?/gi, "IC");
+    if (/amplif|deletion/i.test(pdLine)) continue;
+    // "<1%" is a result; "≥1%" or ">50%" is a threshold.
+    const pd = pdLine.match(/\b(TPS|CPS|TC|IC|TAP)\b[^0-9<\n]{0,12}(<\s?\d{1,3}|(?<![≥>=]\s?)\d{1,3})\s*(%)?/i) || pdLine.match(/(<\s?\d{1,3}|(?<![≥>=<]\s?)\d{1,3})\s*(%)/);
+    if (!pd) continue;
+    const kind = pd.length > 3 ? pd[1].toUpperCase() : "";
+    const v = pd.length > 3 ? pd[2] : pd[1];
+    const lt = /^</.test(v), n = +v.replace(/\D/g, "");
+    out.push({ key: "PD-L1", value: `${kind ? kind + " " : ""}${lt ? "under " + n : n}${kind === "CPS" ? "" : "%"}`, high: !lt && n >= 1 });
+    break;
+  }
+  if (!out.some(b => b.key === "PD-L1")) {
+    // Only a result line counts ("PD-L1 IHC (SP142) Positive", "PD-L1: Negative"), not prose like "PD-L1 negative status".
+    const w = t.match(/PD-?L1(?:\s*\((?:22C3|SP263|SP142|28-8)\))?\s*(?:IHC(?:\s*\((?:22C3|SP263|SP142|28-8)\))?\s*:?|:)\s*(Positive|Negative|High|Low)\b/i);
+    if (w) out.push({ key: "PD-L1", value: titleCaseWord(w[1]) + " (no score given in the text)", high: /positive|high/i.test(w[1]) });
+  }
+  // HER2 protein by immunohistochemistry (IHC), scored 0 to 3+. Only result rows count, not "HER2-positive (IHC 3+)" in drug text.
+  const her2 = t.match(/(?<![A-Za-z0-9-])(?:HER-?2|ERBB2)(?:\/neu)?(?:\s*\([^)\n]{0,15}\))?[\s:]*(?:IHC[\s:]*(?:Protein\s*)?)?(?:\b(Positive|Negative|Equivocal|Low)\b)?[\s|(:]*(?:Score\s*)?([0-3])\+/i);
+  if (her2) {
+    const n = +her2[2];
+    out.push({ key: "HER2", value: `IHC ${n}+ (${n === 3 ? "positive" : n === 2 ? "equivocal" : n === 1 ? "low" : "negative"})`, high: n === 3, score: n });
+  }
+  // Genomic loss of heterozygosity (LOH), a DNA-repair "scar" score some labs report.
+  const loh = t.match(/(?:genomic\s+)?loss\s+of\s+heterozygosity(?:\s*\(LOH\))?[^\n]{0,40}?\b(High|Low)\b(?:[^\n%]{0,20}?(\d{1,3}(?:\.\d+)?)\s*%)?/i)
+    || t.match(/\bLOH\b[^\n]{0,10}\b(High|Low)\b(?:[^\n%]{0,20}?(\d{1,3}(?:\.\d+)?)\s*%)?/);
+  if (loh) out.push({ key: "LOH", value: `${titleCaseWord(loh[1])}${loh[2] ? " (" + loh[2] + "% of the genome)" : ""}`, high: false, lohHigh: /high/i.test(loh[1]) });
+  return out;
+}
+
+function titleCaseWord(w) { return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); }
+function explainChange(f) {
+  const m = f.alt.match(/^([A-Z])(\d+)([A-Z])$/);
+  switch (f.kind) {
+    case "missense": return m && AA_NAME[m[1]] && AA_NAME[m[3]] ? `One building block of the protein is swapped: ${AA_NAME[m[1]]} (${m[1]}) at position ${m[2]} became ${AA_NAME[m[3]]} (${m[3]}). A single swap like this can switch a protein on or off.` : "One building block of the protein is swapped for another.";
+    case "nonsense": return "The gene's instructions end too early, so the protein comes out cut short and usually doesn't work.";
+    case "frameshift": return "DNA letters were added or lost, scrambling the rest of the instructions. The protein usually doesn't work.";
+    case "indel": return `A few building blocks were ${/delins/.test(f.alt) ? "swapped for others" : /ins|dup/.test(f.alt) ? "added" : /del/.test(f.alt) ? "removed" : "removed or added"}${f.exon ? ` (in exon ${f.exon} of the gene)` : ""}. Depending on where, this can switch the protein on or off.`;
+    case "splice": return "A change where the gene's pieces are stitched together. It can produce a faulty protein.";
+    case "amp": return "The tumor has extra copies of this gene, which can make too much of the protein.";
+    case "loss": return "The tumor has lost this gene, so whatever job it did is no longer being done.";
+    case "fusion": return "This gene broke and joined with another gene. The fused gene can make a protein that is always switched on.";
+    case "exon": return /skipping/.test(f.alt) ? "Part of the gene (an exon) is skipped when the protein is made, which can make the protein over-active." : `A change in one section (an exon) of the gene. ${/deletion/.test(f.alt) ? "Some building blocks are missing." : /insertion/.test(f.alt) ? "Some building blocks were added." : ""}`.trim();
+    default: return "A change in this gene.";
+  }
+}
+
+// DNA-repair genes covered by "HRR gene-mutated" approvals (the labels list the exact genes in their studies section).
+const HRR = new Set(["ATM", "BARD1", "BRIP1", "CDK12", "CHEK1", "CHEK2", "FANCL", "PALB2", "RAD51B", "RAD51C", "RAD51D", "RAD54L", "NBN", "MRE11A"]);
+
+// Phrases to search FDA label indications for this finding.
+function labelPhrases(f) {
+  const g = f.gene;
+  if (g === "ERBB2") return ["HER2-positive", "HER2 (ERBB2)", "HER2-mutant", "ERBB2", "HER2-overexpressing", "HER2 overexpressing"];
+  if (/^NTRK[123]$/.test(g)) return ["NTRK"];
+  if (/^BRCA[12]$/.test(g)) return ["BRCA", "homologous recombination repair"];
+  if (HRR.has(g)) return [g, "homologous recombination repair"];
+  if (["MLH1", "MSH2", "MSH6", "PMS2"].includes(g)) return ["mismatch repair deficient", "dMMR"];
+  // Short symbols that are also ordinary words need specific phrases
+  const SPECIFIC = {
+    MET: ["MET exon 14", "MET amplification", "MET overexpression", "MET (c-Met)", "c-Met"],
+    RET: ["RET fusion", "RET gene fusion", "RET-mutant", "RET mutation", "RET-positive", "RET-altered"],
+    KIT: ["KIT (CD117)", "KIT exon", "KIT mutation", "KIT D816V", "KIT-positive", "KIT alteration"],
+    AR: ["androgen receptor"], APC: ["APC gene"], ATM: ["ATM mutation", "ATM-mutated", "ATM,"],
+    ROS1: ["ROS1"], ALK: ["ALK-positive", "ALK fusion", "ALK rearrangement", "ALK-positive", "ALK gene"]
+  };
+  return SPECIFIC[g] || [g];
+}
+function biomarkerPhrases(b) {
+  if (b.key === "MSI" || b.key === "MMR") return ["microsatellite instability-high", "mismatch repair deficient"];
+  if (b.key === "TMB") return ["tumor mutational burden-high", "TMB-H"];
+  if (b.key === "HRD") return ["homologous recombination deficiency", "HRD-positive"];
+  if (b.key === "HER2") return ["HER2-positive", "IHC 3+"];
+  return [];
+}
+
+const GENOMIC_WORD = /mutat|deletion|insertion|substitution|fusion|rearrange|amplif|alteration|positive|skipping|variant|deficien|high\b|\b[A-Z]\d{2,4}[A-Z]\b/i;
+const NOT_TREATMENT = /imaging|diagnostic|PET\b|radioactive diagnostic|for use (?:with|in) (?:PET|imaging)|selection of patients|companion diagnostic|detect/i;
+
+// Split indications into short statements ("... for adult patients with KRAS G12C-mutated NSCLC ...").
+function indicationStatements(text) {
+  return normalize(text).replace(/\(\s*\d+(?:\.\d+)*(?:\s*,\s*\d+(?:\.\d+)*)*\s*\)/g, "\n").replace(/\[\s*see[^\]]*\]/gi, "").replace(/\b\d*\s*INDICATIONS\s+(?:AND|&)\s+USAGE\b/g, "\n")
+    .split(/(?<=[.;:])\s+(?=[A-Z0-9•])|\s+•\s+|\n+/).map(s => s.trim()).filter(s => s.length > 25);
+}
+
+// Which cancer an approval is for: the cancer named nearest the gene mention (labels often list many in one passage).
+const ANY_CANCER = /\bm?CRC\b|\bm?CRPC\b|\bm?CSPC\b|\bTNBC\b|\bRCC\b|\bHCC\b|\bHNSCC\b|\bGEJ\b|\bSCLC\b|\bCLL\b|non-small cell lung|NSCLC|small cell lung|\blung\b|breast|colorectal|\bcolon|rectal|pancrea|prostat|ovarian|fallopian|peritoneal|endometri|uterine|melanoma|urothelial|bladder|thyroid|gastric|stomach|gastroesophageal|esophag|cholangiocarcinoma|biliary|gall ?bladder|glioma|astrocytoma|glioblastoma|head and neck|renal cell|kidney|hepatocellular|gastrointestinal stromal|GIST|sarcoma|acute myeloid|\bAML\b|leukemia|lymphoma|myeloma|myelodysplastic|cervical|mesothelioma|neuroblastoma|histiocytic|solid tumors?/gi;
+function scopeNear(s, at, cancerRe) {
+  let best = null;
+  for (const m of s.matchAll(ANY_CANCER)) {
+    const d = Math.abs(m.index - at);
+    if (d <= 260 && (!best || d < best.d)) best = { d, text: m[0] };
+  }
+  if (!cancerRe) return "unknown";
+  if (!best) return cancerRe.test(s) ? "yours" : /solid tumor/i.test(s) ? "any" : "other";
+  if (cancerRe.test(best.text)) return "yours";
+  if (/solid tumor/i.test(best.text)) return "any";
+  // The nearest named cancer is a different one; still "yours" if your cancer is named close by as well
+  const near = s.slice(Math.max(0, at - 120), at + 160);
+  return cancerRe.test(near) ? "yours" : "other";
+}
+
+// How one indication statement relates to a finding: null (not about it), or {match, scope, note}
+function judgeStatement(st, f, cancerRe, phrases) {
+  const s = st;
+  const gene = f.gene;
+  const escRe = t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const symbols = f.biomarker ? [] : [gene, ...(gene === "ERBB2" ? ["HER2"] : []), ...(/^NTRK/.test(gene) ? ["NTRK"] : []), ...(/^BRCA/.test(gene) ? ["BRCA", "BRCAm"] : [])];
+  const symRe = symbols.length ? new RegExp("(?<![A-Za-z0-9])(" + symbols.map(escRe).join("|") + ")(?![a-z])", "g") : null;
+  const phrRe = new RegExp("(" + phrases.map(escRe).join("|") + ")", "gi");
+  const hits = [...(symRe ? s.matchAll(symRe) : []), ...s.matchAll(phrRe)];
+  if (!hits.length) return null;
+  if (NOT_TREATMENT.test(s) && !/treatment|treat\b/i.test(s)) return null;
+  if (!GENOMIC_WORD.test(s)) return null;
+  if (/not been established|not indicated|not recommended|limitations? of use|is not approved/i.test(s)) return null;
+  // Keep only mentions that are not negated ("no EGFR or ALK aberrations", "HER2-negative", "RAS wild-type")
+  const positive = hits.filter(h => {
+    const before = s.slice(Math.max(0, h.index - 50), h.index);
+    const after = s.slice(h.index + h[0].length, h.index + h[0].length + 40);
+    if (/[- ]?(?:negative|wild[- ]type|non-mutated|unmutated)\b/i.test(after.slice(0, 14))) return false;
+    if (/\b(?:no|without|absence of|negative for|not have|do not have|lacking|other than)\b(?![^.;]*\bwith\b)[^.;]{0,55}$/i.test(before)) return false;
+    const wt = before.match(/(?:\b([A-Z][A-Z0-9]{1,8})[- ])?wild[- ]type\b[^.;]{0,40}$/);
+    if (wt && (!wt[1] || symbols.includes(wt[1])) && !(f.alt && s.includes(f.alt))) return false;
+    if (/\bif\s+(?:the\s+)?(?:tumor\s+is\s+)?$/i.test(before) || /\bif\s+[A-Za-z0-9 -]{0,20}$/i.test(before) && /positive|mutation/i.test(after.slice(0, 25))) return false;
+    return true;
+  });
+  if (!positive.length) return null;
+  const tm = positive[0];
+  const scope = scopeNear(s, tm.index, cancerRe);
+  // Variant-level checks
+  const near = s.slice(Math.max(0, tm.index - 60), tm.index + 160);
+  const tokens = [...near.matchAll(/\b([A-Z])(\d{2,4})([A-Z])\b/g)].map(x => x[0]);
+  // Exons named in the approval, with the kind of change ("exon 19 deletions", "exon 20 insertion")
+  const exonPairs = [...near.matchAll(/exon\s?(\d{1,2})(?:\s*\(?[A-Z]\d+[A-Z]\)?)?\s*(deletion|insertion|skipping|duplication|substitution|mutation|alteration)?/gi)].map(x => ({ n: x[1], type: (x[2] || "").toLowerCase() }));
+  const ourType = /del/i.test(f.alt) && !/ins/i.test(f.alt) ? "deletion" : /ins|dup/i.test(f.alt) ? "insertion" : /skip/i.test(f.alt) ? "skipping" : f.kind === "missense" ? "substitution" : "";
+  const typeOk = t => !t || t === "mutation" || t === "alteration" || t === ourType || (t === "duplication" && ourType === "insertion");
+  const exons = exonPairs.filter(e => typeOk(e.type)).map(e => e.n);
+  const anyExons = [...new Set(exonPairs.map(e => e.n))];
+  const isFusionStmt = /fusion|rearrange|ALK-positive|ROS1-positive|RET-positive/i.test(near);
+  const isAmpStmt = /amplif|HER2-positive|HER2 overexpress|IHC 3\+|copy number/i.test(near);
+  const isBiomarker = !!f.biomarker;
+  if (!isBiomarker && /homologous recombination repair|\bHRR\b/i.test(near) && !(symRe && [...near.matchAll(new RegExp(symRe.source, "g"))].length)) {
+    return { match: true, scope, note: `Approved for tumors with changes in homologous recombination repair (HRR) genes, a group of DNA-repair genes. Ask whether ${gene} is on this drug's list.` };
+  }
+  if (/ITD/.test(f.alt) && /\bITD\b|internal tandem/i.test(near)) return { match: true, scope, note: "" };
+  if (isBiomarker) return { match: true, scope, note: "" };
+  if (f.kind === "fusion") return isFusionStmt || /NTRK|positive/i.test(near) ? { match: true, scope, note: "" } : null;
+  if (f.kind === "amp") return isAmpStmt ? { match: true, scope, note: gene === "ERBB2" ? "HER2-positive status is confirmed with lab tests on the tumor; ask whether this result qualifies." : "" } : null;
+  if (f.kind === "loss") return /loss|deleti|deficien|alteration/i.test(near) && !tokens.length ? { match: true, scope, note: "Approved for alterations in this gene; ask whether a loss counts." } : null;
+  if (isFusionStmt && !/mutat|mutant|alteration|variant/i.test(near)) return null;
+  if (isAmpStmt && !/mutat|mutant|alteration|variant/i.test(near) && gene !== "MET") return null;
+  if (tokens.length) {
+    const ours = f.alt.replace(/^([A-Z]\d+)([A-Z])$/, "$1$2");
+    if (tokens.includes(ours)) return { match: true, scope, note: "" };
+    if (f.kind === "missense" && tokens.some(t => t.slice(0, -1) === ours.slice(0, -1)) && /or other|V600/i.test(near)) return { match: true, scope, note: "Approved for changes at this position; confirm the exact change qualifies." };
+    if (exons.length && f.exon && exons.includes(String(f.exon))) return { match: true, scope, note: f.kind === "exon" ? "" : `Your change (${f.alt}) is in exon ${f.exon}; confirm it is the type of exon ${f.exon} change the approval covers.` };
+    return { match: false, scope, note: `Approved only for ${gene} ${[...new Set(tokens)].join(", ")}${anyExons.length ? " or exon " + anyExons.join("/") + " changes" : ""}, not ${f.alt}.` };
+  }
+  if (anyExons.length) {
+    const ex = f.exon ? String(f.exon) : null;
+    const desc = exonPairs.map(e => `exon ${e.n}${e.type ? " " + e.type : ""}`).filter((v, i, a) => a.indexOf(v) === i).join(" or ");
+    const exactType = exonPairs.some(e => e.n === ex && e.type && e.type === ourType);
+    if (ex) return exons.includes(ex) ? { match: true, scope, note: f.kind === "exon" || exactType ? "" : `Your change (${f.alt}) is in exon ${f.exon}; confirm it is the type of change the approval covers.` } : { match: false, scope, note: `Approved for ${gene} ${desc}, not ${f.alt}.` };
+    return { match: true, scope, note: `Approved for ${gene} ${desc}. Ask whether ${f.alt} is one of them.` };
+  }
+  const RESISTANCE = { EGFR: ["T790M", "C797S"], KIT: ["D816V"], ALK: ["G1202R"] };
+  if (/non-resistant/i.test(near) && (RESISTANCE[gene] || []).includes(f.alt)) return { match: false, scope, note: `Approved for non-resistant ${gene} mutations; ${f.alt} is a resistance mutation.` };
+  // Most EGFR exon 20 insertions resist the older EGFR pills; A763_Y764insFQEA is the known exception.
+  if (/non-resistant/i.test(near) && gene === "EGFR" && f.exon === 20 && /ins|dup/.test(f.alt) && !/^A763_Y764insFQEA$/.test(f.alt)) return { match: false, scope, note: "Approved for non-resistant EGFR mutations. Most exon 20 insertions are resistant to this type of drug, so this approval is unlikely to apply; ask the oncologist." };
+  // Approvals limited to the kinase domain (UniProt: ERBB2 720-987, EGFR 712-979).
+  const KINASE = { ERBB2: [720, 987], EGFR: [712, 979] };
+  const pos = (f.alt.match(/^[A-Z](\d+)/) || [])[1];
+  if (/tyrosine kinase domain|\bTKD\b/i.test(near) && KINASE[gene] && pos) {
+    const [a, b] = KINASE[gene];
+    if (+pos < a || +pos > b) return { match: false, scope, note: `Approved for ${gene} changes in the tyrosine kinase domain (protein positions ${a} to ${b}); ${f.alt} lies outside it.` };
+    return { match: true, scope, note: `Approved for activating changes in the ${gene} kinase domain, where ${f.alt} lies; ask whether it counts as activating.` };
+  }
+  if (/mutat|mutant|alteration|variant|deleterious|deficien/i.test(near)) return { match: true, scope, note: `Approved for ${gene} mutations in general; ask whether this specific change qualifies.` };
+  return null;
+}
+/* ---------- End pure helpers ---------- */
+
+const $ = id => document.getElementById(id);
+const KIT = "https://aneelpaulus.github.io/";
+const CANCERS = [
+  ["Lung (non-small cell)", /non-small cell lung|NSCLC|\blung\b/i, "non-small cell lung cancer"],
+  ["Breast", /breast|\bTNBC\b|\bm?BC\b/i, "breast cancer"],
+  ["Colorectal (colon or rectum)", /colorectal|\bcolon|rectal|\bm?CRC\b/i, "colorectal cancer"],
+  ["Pancreatic", /pancrea/i, "pancreatic cancer"],
+  ["Prostate", /prostat|\bm?CRPC\b|\bm?CSPC\b|\bm?HSPC\b/i, "prostate cancer"],
+  ["Ovarian, fallopian tube, or peritoneal", /ovarian|fallopian|peritoneal/i, "ovarian cancer"],
+  ["Endometrial or uterine", /endometri|uterine/i, "endometrial cancer"],
+  ["Melanoma", /melanoma/i, "melanoma"],
+  ["Bladder or urothelial", /urothelial|(?<!gall ?)bladder/i, "urothelial carcinoma"],
+  ["Thyroid", /thyroid/i, "thyroid cancer"],
+  ["Stomach or esophagus", /gastric|stomach|gastroesophageal|esophag|\bGEJ\b/i, "gastric cancer"],
+  ["Bile duct or gallbladder (biliary tract)", /cholangiocarcinoma|biliary|bile duct|gall ?bladder|\bBTC\b/i, "biliary tract cancer"],
+  ["Brain (glioma)", /glioma|astrocytoma|glioblastoma|oligodendroglioma/i, "glioma"],
+  ["Head and neck", /head and neck|\bHNSCC\b|\bSCCHN\b/i, "head and neck cancer"],
+  ["Kidney", /renal cell|kidney|\bRCC\b/i, "renal cell carcinoma"],
+  ["Liver", /hepatocellular|liver|\bHCC\b/i, "hepatocellular carcinoma"],
+  ["GIST (gastrointestinal stromal tumor)", /gastrointestinal stromal|GIST/i, "gastrointestinal stromal tumor"],
+  ["Sarcoma", /sarcoma/i, "sarcoma"],
+  ["Acute myeloid leukemia (AML)", /acute myeloid|\bAML\b/i, "acute myeloid leukemia"],
+  ["Other blood cancer", /leukemia|lymphoma|myeloma|myelodysplastic|myelofibrosis/i, "hematologic malignancy"],
+  ["Other or not sure", null, ""]
+];
+let state = null;
+let pdfImagePages = []; // pages of the last uploaded PDF that were pictures with no text
+
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function setStatus(m, err) { $("status").textContent = m || ""; $("status").className = "status" + (err ? " err" : ""); }
+function titleCase(s) { return String(s || "").toLowerCase().replace(/(^|[\s\-\/(])([a-z])/g, (m, a, b) => a + b.toUpperCase()); }
+
+async function getJSON(url, opts) {
+  const r = await fetch(url, opts);
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+async function pool(items, n, fn) {
+  const out = new Array(items.length); let i = 0;
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
+    while (i < items.length) { const k = i++; try { out[k] = await fn(items[k]); } catch (e) { out[k] = { error: e }; } }
+  }));
+  return out;
+}
+
+const labelCache = new Map();
+async function labelsFor(phrases) {
+  const key = phrases.join("|");
+  if (labelCache.has(key)) return labelCache.get(key);
+  const q = phrases.map(p => `indications_and_usage:"${p}"`).join(" ");
+  const p = (async () => {
+    const url = skip => `https://api.fda.gov/drug/label.json?search=${encodeURIComponent(q)}&limit=100&skip=${skip}`;
+    const first = await getJSON(url(0));
+    let all = (first && first.results) || [];
+    const total = Math.min(((first && first.meta && first.meta.results) || {}).total || 0, 400);
+    for (let skip = 100; skip < total; skip += 100) { const r = await getJSON(url(skip)).catch(() => null); all = all.concat((r && r.results) || []); }
+    return all;
+  })();
+  labelCache.set(key, p);
+  return p;
+}
+
+// Drugs whose FDA label is still online but which were taken off the US market (checked one by one; add only with a source).
+const WITHDRAWN = { mobocertinib: "No longer sold in the US: the maker withdrew it after its confirmatory trial missed its main goal." };
+const SALT_WORD = /^(hydrochloride|dihydrochloride|mesylate|dimesylate|tosylate|monohydrate|potassium|sodium|dimaleate|maleate|malate|sulfate|citrate|phosphate|fumarate|succinate|besylate|camsylate|tartrate|hydrobromide|acetate)$/i;
+function cleanGeneric(g) {
+  return String(g).toLowerCase().replace(/\s+and\s+(?:bera)?hyaluronidase.*$/, "")
+    .split(/\s+and\s+|,\s*/).map(part => part.split(/\s+/).filter(w => !SALT_WORD.test(w)).join(" ")).filter(Boolean).join(" and ").trim();
+}
+
+// Drugs whose FDA label mentions this finding, split by scope: your cancer, any solid tumor, other cancers, not a match.
+async function drugMatches(f, cancer) {
+  const phrases = f.biomarker ? biomarkerPhrases(f) : labelPhrases(f);
+  if (!phrases.length) return { yours: [], any: [], other: [], nomatch: [] };
+  const labels = await labelsFor(phrases);
+  // The FDA database keeps older label versions too (a removed indication can live on in one).
+  // Read only the most recent label for each drug name.
+  const newest = new Map();
+  for (const L of labels) {
+    const o = L.openfda || {};
+    const apps = o.application_number || [];
+    if (apps.length && !apps.some(a => /^(NDA|BLA)/.test(a))) continue;
+    // Without the tidy name fields, read the product text ("Herceptin Hylecta Trastuzumab and hyaluronidase-oysk
+    // TRASTUZUMAB ..."): the ingredient is the first word after the brand that is repeated later in capitals.
+    const el = ((L.spl_product_data_elements || [""])[0] || "").split(" ");
+    const bare = w => w.replace(/[^A-Za-z0-9-]/g, "").toUpperCase();
+    // Two clues, whichever comes first: a lowercase word ("OGIVRI trastuzumab-dkst"), or a word repeated later in capitals ("PERJETA Pertuzumab PERTUZUMAB").
+    const lower = el.findIndex((w, i) => i > 0 && /^[a-z]/.test(w) && !/^(and|with|of|for)$/.test(w));
+    const repeated = el.findIndex((w, i) => i > 0 && bare(w).length > 3 && el.slice(i + 1).some(x => x === x.toUpperCase() && bare(x) === bare(w)));
+    const gi = [lower, repeated].filter(i => i > 0).sort((x, y) => x - y)[0] || -1;
+    const elName = gi > 0 ? el[gi] : el.length > 1 && !SALT_WORD.test(el[1]) && el[1].toLowerCase() !== el[0].toLowerCase() ? el[1] : el[0];
+    const elBrand = gi > 0 ? el.slice(0, gi).join(" ") : el[0] || "";
+    const name = cleanGeneric((o.generic_name || [])[0] || elName || "");
+    if (!name) continue;
+    const brand = (o.brand_name || [])[0] || elBrand;
+    const key = name + "|" + brand.toLowerCase();
+    const prev = newest.get(key);
+    if (!prev || String(L.effective_time || "") > String(prev.L.effective_time || "")) newest.set(key, { L, name, brand, key });
+  }
+  const byDrug = new Map();
+  for (const { L, name, brand, key } of newest.values()) {
+    for (const st of indicationStatements((L.indications_and_usage || []).join(" "))) {
+      const j = judgeStatement(st, f, cancer[1], phrases);
+      if (!j) continue;
+      const bucket = j.match ? (j.scope === "yours" || j.scope === "unknown" ? "yours" : j.scope) : "nomatch";
+      const general = j.match && /in general|Ask whether/.test(j.note);
+      const list = byDrug.get(key) || [];
+      list.push({ bucket, general, generic: name, brand: titleCase(brand), statement: st, note: [WITHDRAWN[name], j.note].filter(Boolean).join(" "), withdrawn: !!WITHDRAWN[name] });
+      byDrug.set(key, list);
+    }
+  }
+  // Per drug: an exact match wins; otherwise, if the label names specific changes that aren't this one,
+  // that beats a general "EGFR mutation-positive" heading; a general match is the last resort.
+  const rank = { yours: 0, any: 1, other: 2 };
+  const res = { yours: [], any: [], other: [], nomatch: [] };
+  for (const [name, list] of byDrug) {
+    const exact = list.filter(x => x.bucket !== "nomatch" && !x.general).sort((a, b) => rank[a.bucket] - rank[b.bucket]);
+    const general = list.filter(x => x.general).sort((a, b) => rank[a.bucket] - rank[b.bucket]);
+    const miss = list.filter(x => x.bucket === "nomatch");
+    const pick = exact[0] || (miss[0] && general.every(g => g.bucket !== "yours" || true) && miss.length ? miss[0] : null) || general[0];
+    if (pick) res[pick.bucket].push(pick);
+  }
+  for (const k in res) res[k].sort((a, b) => a.generic.localeCompare(b.generic));
+  return res;
+}
+
+function trialTerm(f) {
+  if (f.biomarker) return f.key === "TMB" ? "tumor mutational burden" : f.key === "HRD" ? "homologous recombination deficiency" : f.key === "HER2" ? "HER2-positive" : "microsatellite instability";
+  if (f.kind === "fusion") return /^NTRK/.test(f.gene) ? "NTRK fusion" : `${f.gene} fusion`;
+  if (f.kind === "amp") return f.gene === "ERBB2" ? "HER2 amplification" : `${f.gene} amplification`;
+  if (f.kind === "loss") return `${f.gene} loss`;
+  if (f.kind === "missense" || f.kind === "exon") return `${f.gene} ${f.alt}`;
+  return `${f.gene} mutation`;
+}
+async function trialsFor(f, cancer) {
+  const term = trialTerm(f);
+  const params = new URLSearchParams({ "query.term": `"${term}"`, "filter.overallStatus": "RECRUITING", countTotal: "true", pageSize: "3", fields: "NCTId,BriefTitle,Phase" });
+  if (cancer[2]) params.set("query.cond", cancer[2]);
+  const r = await getJSON(`https://clinicaltrials.gov/api/v2/studies?${params}`);
+  const web = new URLSearchParams({ term: `"${term}"`, aggFilters: "status:rec" });
+  if (cancer[2]) web.set("cond", cancer[2]);
+  return { total: (r && r.totalCount) || 0, top: ((r && r.studies) || []).map(s => ({ id: s.protocolSection.identificationModule.nctId, title: s.protocolSection.identificationModule.briefTitle })), link: `https://clinicaltrials.gov/search?${web}`, term };
+}
+
+function civicName(f) {
+  if (f.kind === "missense" || f.kind === "indel" || f.kind === "nonsense" || f.kind === "frameshift") return `${f.gene} ${f.alt}`;
+  if (f.kind === "amp") return `${f.gene} Amplification`;
+  if (f.kind === "fusion") return `${f.gene} Fusion`;
+  if (f.kind === "loss") return `${f.gene} Loss`;
+  if (f.kind === "exon") return `${f.gene} ${f.alt.replace(/^exon (\d+) (\w+).*/, (m, n, w) => `Exon ${n} ${titleCase(w)}`)}`;
+  return null;
+}
+async function civicFor(f, cancer) {
+  const name = civicName(f);
+  const query = `query($g:String!,$n:String!){ gene(entrezSymbol:$g){ id description }
+    evidenceItems(molecularProfileName:$n, evidenceType: PREDICTIVE, status: ACCEPTED, first: 100){ totalCount nodes { molecularProfile { name } evidenceLevel significance disease { name } therapies { name } } } }`;
+  const r = await getJSON("https://civicdb.org/api/graphql", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query, variables: { g: f.gene, n: name || f.gene } }) });
+  const d = (r && r.data) || {};
+  const nodes = ((d.evidenceItems || {}).nodes || []).filter(n => !name || n.molecularProfile.name.toLowerCase().includes(name.toLowerCase()));
+  const tally = (sig) => {
+    const m = new Map();
+    for (const n of nodes.filter(n => n.significance === sig && "AB".includes(n.evidenceLevel))) for (const t of n.therapies) m.set(t.name, (m.get(t.name) || 0) + 1);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t, c]) => `${t} (${c})`);
+  };
+  // Level A ("validated") sensitivity evidence: the strongest tier, usually an approval or guideline-level finding.
+  const levelA = new Map();
+  for (const n of nodes.filter(n => n.significance === "SENSITIVITYRESPONSE" && n.evidenceLevel === "A" && n.therapies.length)) {
+    const therapy = n.therapies.map(t => t.name).join(" + ");
+    const dis = (n.disease && n.disease.name) || "";
+    const e = levelA.get(therapy) || { therapy, diseases: new Set(), yours: false };
+    if (dis) e.diseases.add(dis);
+    if (cancer && cancer[1] && cancer[1].test(dis)) e.yours = true;
+    levelA.set(therapy, e);
+  }
+  return { gene: d.gene, count: nodes.length, sensitive: tally("SENSITIVITYRESPONSE"), resistant: tally("RESISTANCE"), name,
+    levelA: [...levelA.values()].map(e => ({ ...e, diseases: [...e.diseases] })) };
+}
+
+async function readPdf(file) {
+  const pdfjs = await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs");
+  pdfjs.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs";
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  let text = "";
+  readPdf.imagePages = [];
+  for (let p = 1; p <= Math.min(doc.numPages, 60); p++) {
+    const page = await doc.getPage(p);
+    const c = await page.getTextContent();
+    // Rebuild lines from positions: lab PDFs often store a table's gene names apart from their changes,
+    // and some draw each word twice (for a bold effect), which reads as "PT TCH1 CH1" without this.
+    const items = c.items.filter(it => it.str && it.str.trim() && it.transform)
+      .map(it => ({ x: it.transform[4], y: it.transform[5], w: it.width || 0, s: it.str, h: Math.abs(it.transform[3]) || 10 }))
+      .sort((a, b) => b.y - a.y || a.x - b.x);
+    const lines = [];
+    for (const it of items) {
+      const last = lines[lines.length - 1];
+      if (last && Math.abs(last.y - it.y) <= Math.max(2, it.h * 0.4)) last.items.push(it);
+      else lines.push({ y: it.y, items: [it] });
+    }
+    text += `[Page ${p}]\n`;
+    // A page with almost no text is probably a picture of a page (some labs print summary pages as images).
+    if (items.map(it => it.s).join("").replace(/[^A-Za-z]/g, "").length < 80) readPdf.imagePages.push(p);
+    for (const l of lines) {
+      l.items.sort((a, b) => a.x - b.x);
+      let out = "", end = -Infinity;
+      for (const it of l.items) {
+        const cw = it.w && it.s.length ? it.w / it.s.length : it.h * 0.5;
+        let str = it.s;
+        if (it.x < end - cw * 0.5) {
+          const skip = Math.round((end - it.x) / cw);
+          if (skip >= str.length) continue;
+          str = str.slice(skip);
+        } else if (out && it.x - end > cw * 0.3) out += it.x - end > cw * 1.6 ? "  " : " ";
+        out += str; end = Math.max(end, it.x + it.w);
+      }
+      // Letter-spaced headings ("G E N O M I C  V A R I A N T S") become words; wide gaps become single spaces.
+      out = out.replace(/(?:(?<![A-Za-z])[A-Z] ){3,}[A-Z](?![A-Za-z])/g, m => m.replace(/ /g, "")).replace(/\s+/g, " ").trim();
+      if (out) text += out + "\n";
+    }
+    text += "\n";
+  }
+  return text;
+}
+
+async function run() {
+  const raw = $("report").value;
+  if (!raw.trim()) { setStatus("Paste the report, upload the PDF, or try the sample first."); return; }
+  const cancer = CANCERS[+$("cancer").value];
+  const findings = parseFindings(raw);
+  const biomarkers = parseBiomarkers(raw);
+  if (!findings.length && !biomarkers.length) {
+    setStatus("No gene changes were recognized. Try typing them in, for example: KRAS G12C, EGFR exon 19 deletion, ALK fusion, ERBB2 amplification.", true);
+    $("out").hidden = true; return;
+  }
+  $("go").disabled = true; $("out").hidden = true;
+  setStatus(`Found ${findings.length} gene change${findings.length === 1 ? "" : "s"}${biomarkers.length ? " and " + biomarkers.length + " tumor-wide marker" + (biomarkers.length === 1 ? "" : "s") : ""}. Looking up drugs, trials, and research...`);
+  try {
+    const active = findings.filter(f => !f.vus);
+    const bioTargets = biomarkers.filter(b => b.high && biomarkerPhrases(b).length && !(b.key === "HER2" && findings.some(f => f.gene === "ERBB2" && f.kind === "amp"))).map(b => ({ ...b, biomarker: true, gene: b.key, alt: b.value }));
+    const [drugs, trials, civic, bioDrugs, bioTrials] = await Promise.all([
+      pool(active, 3, f => drugMatches(f, cancer)),
+      pool(active, 3, f => trialsFor(f, cancer)),
+      pool(findings, 3, f => civicFor(f, cancer)),
+      pool(bioTargets, 2, b => drugMatches(b, cancer)),
+      pool(bioTargets, 2, b => trialsFor(b, cancer))
+    ]);
+    active.forEach((f, i) => { f.drugs = drugs[i] && !drugs[i].error ? drugs[i] : null; f.trials = trials[i] && !trials[i].error ? trials[i] : null; });
+    findings.forEach((f, i) => { f.civic = civic[i] && !civic[i].error ? civic[i] : null; });
+    bioTargets.forEach((b, i) => { b.drugs = bioDrugs[i] && !bioDrugs[i].error ? bioDrugs[i] : null; b.trials = bioTrials[i] && !bioTrials[i].error ? bioTrials[i] : null; });
+    const liquid = /cfDNA|cell-free DNA|liquid biopsy|Guardant\s*360|FoundationOne\s*Liquid|Tempus\s*xF\b|\bxF\b[^\n]{0,30}liquid/i.test(raw);
+    const imagePages = /^\[Page 1\]/.test(raw) ? pdfImagePages : [];
+    state = { cancer, findings, biomarkers, bioTargets, liquid, imagePages };
+    render();
+    const failed = [...drugs, ...trials].some(x => x && x.error);
+    setStatus(failed ? "Some lookups didn't respond, so a few results may be missing. Try again in a minute." : "", failed);
+  } catch (e) {
+    setStatus("Couldn't reach the lookup services. Please try again. (" + e.message + ")", true);
+  } finally { $("go").disabled = false; }
+}
+
+function drugItem(d) {
+  return `<li class="drug"><a href="${KIT}drug-label-explainer/?drug=${encodeURIComponent(d.generic)}">${esc(d.brand || titleCase(d.generic))}</a> <span class="hint">(${esc(d.generic)})</span>
+    <div class="quote">${esc(d.statement.length > 260 ? d.statement.slice(0, 260).replace(/\s\S*$/, "") + "..." : d.statement)}</div>${d.note ? `<div class="hint">${esc(d.note)}</div>` : ""}</li>`;
+}
+
+function badgeFor(f) {
+  if (f.vus) return `<span class="badge b-gray">Unknown significance</span>`;
+  const d = f.drugs;
+  const b = [];
+  if (f.ch) b.push(`<span class="badge b-gray">May be from blood cells, not the tumor</span>`);
+  if (d && (d.yours.length || d.any.length)) b.push(`<span class="badge b-ok">FDA-approved drug for this change</span>`);
+  else if (d && d.other.length) b.push(`<span class="badge b-warn">Approved drugs in other cancers</span>`);
+  if (f.trials && f.trials.total) b.push(`<span class="badge b-vio">${f.trials.total} recruiting trial${f.trials.total === 1 ? "" : "s"}</span>`);
+  return b.join("");
+}
+
+function inheritedNote(f) {
+  if (f.germline) return "reported";
+  // Copy-number changes and fusions found in a tumor are almost always acquired, not inherited.
+  if (f.kind === "amp" || f.kind === "loss" || f.kind === "fusion") return null;
+  if (f.germlinePossible) return "strong";
+  // A variant of unknown significance is not, by itself, a reason for genetic counseling.
+  if (f.vus) return null;
+  // If the report already lists this gene in its germline section, the general note adds nothing.
+  if (state && state.findings && state.findings.some(g => g.germline && g.gene === f.gene)) return null;
+  if (HEREDITARY_STRONG.has(f.gene) || (f.germlineNote && (HEREDITARY_POSSIBLE.has(f.gene) || HEREDITARY_STRONG.has(f.gene)))) return "strong";
+  if (HEREDITARY_POSSIBLE.has(f.gene)) return "possible";
+  return null;
+}
+
+// Strong published evidence from CIViC that the FDA lists above don't already cover. Not a treatment guideline.
+function civicBlock(f, d, cancerName) {
+  const c = f.civic;
+  if (!c || !c.levelA || !c.levelA.length) return "";
+  const listed = [...d.yours, ...d.any, ...d.other].map(x => x.generic.toLowerCase());
+  // A combination counts as listed if any of its drugs is already listed: that drug's FDA label usually covers the combination.
+  const isListed = t => t.toLowerCase().split(" + ").some(part => listed.some(g => g.includes(part) || part.includes(g)));
+  const extra = c.levelA.filter(e => !isListed(e.therapy));
+  if (!extra.length) return "";
+  const known = !!state.cancer[2];
+  const mine = known ? extra.filter(e => e.yours) : extra;
+  const rest = known ? extra.filter(e => !e.yours) : [];
+  const item = e => `<li><strong>${esc(e.therapy)}</strong>${e.diseases.length ? ` <span class="hint">(${esc(e.diseases.slice(0, 3).join(", "))})</span>` : ""}</li>`;
+  return `<div class="sub">Strong published evidence (not in the FDA lists above)</div>
+    <p class="hint">From CIViC, a free database where cancer experts grade the research. These have its top grade, "validated." That is not the same as a treatment guideline or an FDA approval, so ask the doctor whether any apply.</p>
+    ${mine.length ? `<p style="margin:4px 0 0">${known ? "In " + esc(cancerName) + ":" : ""}</p><ul class="clean">${mine.map(item).join("")}</ul>` : ""}
+    ${rest.length ? `<details><summary>In other cancers (${rest.length})</summary><ul class="clean">${rest.map(item).join("")}</ul></details>` : ""}`;
+}
+
+function findingCard(f) {
+  const d = f.drugs || { yours: [], any: [], other: [], nomatch: [] };
+  const inh = inheritedNote(f);
+  const cancerName = state.cancer[2] ? state.cancer[0].toLowerCase() : "";
+  const civic = f.civic;
+  return `<div class="card finding">
+    <div class="head"><span class="name">${esc(f.gene)} ${esc(f.alt)}</span>${badgeFor(f)}${inh === "reported" ? `<span class="badge b-bad">Found in normal DNA</span>` : inh === "strong" ? `<span class="badge b-bad">May be inherited</span>` : ""}</div>
+    ${f.vus ? `<div class="callout info" style="margin:6px 0">The report lists this as a <strong>variant of unknown significance</strong>: scientists don't yet know whether it matters. It usually isn't used to choose treatment.</div>` : ""}
+    <p><strong>What this gene does:</strong> ${esc(GENES[f.gene] || "This tool doesn't have a plain-English description of this gene yet. Reports usually describe each gene in their variant details section.")}</p>
+    <p><strong>What the change means:</strong> ${esc(explainChange(f))}${f.effect === "gain" ? " The lab labels it gain-of-function: it likely switches the protein on or makes it overactive." : f.effect === "loss" ? " The lab labels it loss-of-function: it likely switches the gene off." : ""}</p>
+    ${inh === "reported" ? `<p class="callout warn" style="margin:6px 0"><strong>Found in normal DNA.</strong> The report lists this change in its germline section, meaning it was also found in normal (blood or saliva) DNA, so it was most likely inherited and relatives could carry it. The report usually recommends genetic counseling and confirmatory testing. Ask the doctor about both.</p>` : ""}
+    ${inh === "strong" ? `<p class="hint"><strong>Inherited?</strong> Changes in ${esc(f.gene)} are sometimes inherited, and a tumor test alone usually can't tell. Ask the doctor whether genetic counseling and testing are recommended, for you and possibly your relatives.</p>` : ""}
+    ${inh === "possible" ? `<p class="hint">Changes in ${esc(f.gene)} are usually found only in the tumor, but occasionally they run in families. If there is a strong family history of cancer, mention it to the doctor.</p>` : ""}
+    ${!f.vus ? `
+      ${d.yours.length ? `<div class="sub">FDA-approved for this change${cancerName ? " in " + esc(cancerName) : ""}</div><ul class="clean">${d.yours.map(drugItem).join("")}</ul>` : `<div class="sub">FDA-approved for this change${cancerName ? " in " + esc(cancerName) : ""}</div><p class="hint">None found in FDA labels.</p>`}
+      ${d.any.length ? `<div class="sub">Approved for any solid tumor with this change</div><ul class="clean">${d.any.map(drugItem).join("")}</ul>` : ""}
+      ${d.other.length ? `<div class="sub">Approved for this change in other cancers</div><p class="hint">Not approved for ${cancerName || "this cancer"}. A doctor may still consider them, but it would be off-label.</p><ul class="clean">${d.other.map(drugItem).join("")}</ul>` : ""}
+      ${civicBlock(f, d, cancerName)}
+      ${d.nomatch.length ? `<details><summary>Drugs for other ${esc(f.gene)} changes, not this one (${d.nomatch.length})</summary><ul class="clean">${d.nomatch.map(drugItem).join("")}</ul></details>` : ""}
+      ${f.trials ? `<div class="sub">Clinical trials</div><p>${f.trials.total ? `<a href="${esc(f.trials.link)}" target="_blank" rel="noopener">${f.trials.total} recruiting trial${f.trials.total === 1 ? "" : "s"}</a> mention ${esc(f.trials.term)}${cancerName ? " in " + esc(cancerName) : ""}.` : `No recruiting trials found that mention ${esc(f.trials.term)}${cancerName ? " in " + esc(cancerName) : ""}.`}</p>
+        ${f.trials.top.length ? `<ul class="clean">${f.trials.top.map(t => `<li><a href="https://clinicaltrials.gov/study/${esc(t.id)}" target="_blank" rel="noopener">${esc(t.title)}</a></li>`).join("")}</ul>` : ""}` : ""}
+    ` : ""}
+    <div class="tech">
+      <div>${f.vaf != null ? `Variant allele fraction: <strong>${f.vaf}%</strong>. ` : ""}Change type: ${esc(f.kind)}.${f.germlineNote ? " The report mentions germline testing near this finding." : ""}</div>
+      ${civic ? `<div style="margin-top:6px">CIViC predictive evidence for ${esc(civic.name || f.gene)}: ${civic.count} accepted item${civic.count === 1 ? "" : "s"}.
+        ${civic.sensitive.length ? `<br>Sensitivity (levels A/B): ${esc(civic.sensitive.join(", "))}` : ""}
+        ${civic.resistant.length ? `<br>Resistance (levels A/B): ${esc(civic.resistant.join(", "))}` : ""}</div>
+        ${civic.gene && civic.gene.description ? `<details><summary>CIViC gene summary</summary><p>${esc(civic.gene.description)}</p></details>` : ""}` : ""}
+      <div class="row" style="margin:6px 0 0">${civic && civic.gene ? `<a href="https://civicdb.org/features/${civic.gene.id}" target="_blank" rel="noopener">CIViC</a>` : ""}
+        <a href="https://www.oncokb.org/gene/${encodeURIComponent(f.gene)}${/^[A-Z]\d+[A-Z*]$/.test(f.alt) ? "/" + encodeURIComponent(f.alt) : ""}" target="_blank" rel="noopener">OncoKB</a>
+        <a href="${KIT}drug-target-tracker/?target=${encodeURIComponent(f.gene)}">All drugs aimed at ${esc(f.gene)}</a></div>
+    </div>
+  </div>`;
+}
+
+function render() {
+  const s = state;
+  $("out").hidden = false;
+  const actionable = s.findings.filter(f => !f.vus && f.drugs && (f.drugs.yours.length || f.drugs.any.length));
+  const vus = s.findings.filter(f => f.vus);
+  const inh = s.findings.filter(f => inheritedNote(f) === "strong");
+  const germ = s.findings.filter(f => inheritedNote(f) === "reported");
+  const ch = s.findings.filter(f => f.ch);
+  $("tiles").innerHTML = [
+    ["Gene changes found", s.findings.length - vus.length],
+    ["With an FDA-approved drug" + (s.cancer[2] ? " for this cancer" : ""), actionable.length],
+    ["Unknown significance", vus.length],
+    ["Tumor-wide markers", s.biomarkers.length]
+  ].map(([k, v]) => `<div class="tile"><div class="hint">${esc(k)}</div><div class="num">${v}</div></div>`).join("");
+
+  $("inherited").innerHTML = (s.imagePages && s.imagePages.length ? `<div class="callout warn"><strong>Part of this PDF couldn't be read.</strong> Page${s.imagePages.length > 1 ? "s" : ""} ${s.imagePages.join(", ")} ${s.imagePages.length > 1 ? "are pictures" : "is a picture"} with no text, so anything printed only there (often the summary, TMB, or MSI) is missing below. Check ${s.imagePages.length > 1 ? "those pages" : "that page"} on the report.</div>` : "") + (s.liquid ? `<div class="callout info"><strong>This looks like a blood test (liquid biopsy).</strong> It reads small amounts of tumor DNA that shed into the blood, so the percentages are usually low, and that is expected. A "not detected" result doesn't prove the tumor lacks a change: if the tumor sheds little DNA, changes can be missed. When an important result is negative, doctors sometimes test tumor tissue as well.</div>` : "")
+    + (germ.length ? `<div class="callout warn"><strong>Inherited changes reported.</strong> The report's germline section lists ${germ.map(f => esc(f.gene + " " + f.alt)).join(", ")}. These were found in normal DNA, so they were most likely inherited. Ask the doctor about genetic counseling and whether relatives should be tested.</div>` : "")
+    + (ch.length ? `<div class="callout info"><strong>May not come from the tumor.</strong> The report says ${ch.map(f => esc(f.gene + " " + f.alt)).join(", ")} may come from clonal hematopoiesis: changes that build up in blood cells with age, separate from the tumor, which blood tests can pick up. A drug aimed at a change like this may not help against the cancer. Ask the doctor whether it is from the tumor.</div>` : "")
+    + (inh.length ? `<div class="callout warn"><strong>Possibly inherited changes.</strong> This report includes ${inh.map(f => esc(f.gene)).join(", ")}, ${inh.length === 1 ? "a gene" : "genes"} where changes are sometimes passed down in families. A tumor test usually can't tell whether a change was inherited. Ask the doctor about genetic counseling and germline testing.</div>` : "");
+
+  $("biomarkers").innerHTML = s.biomarkers.length ? `<h2>Tumor-wide markers</h2>` + s.biomarkers.map(b => {
+    const t = s.bioTargets.find(x => x.key === b.key);
+    const meaning = {
+      TMB: b.high ? "High. Tumors with many changes are more likely to respond to immunotherapy." : "Not high (under 10 per megabase).",
+      MSI: b.unclear ? "The report shows MSI as a scale (stable, equivocal, high) with the result highlighted, which can't be read from the text. Check which one is marked on the report." : b.high ? "High. The DNA spell-checker is broken, which often makes immunotherapy more effective." : "Stable. The DNA spell-checker appears to be working.",
+      MMR: "The DNA spell-checker proteins are missing. This often makes immunotherapy more effective.",
+      HRD: "The tumor has trouble repairing a type of DNA damage, which can make PARP inhibitors and platinum chemotherapy work better.",
+      "PD-L1": "A protein that cancer uses to hide from the immune system. Higher levels can mean some immunotherapies work better.",
+      HER2: b.score === 3 ? "The tumor cells carry a lot of the HER2 protein on their surface. This is the protein that HER2-targeted drugs attach to, and it is one of the tests that decides whether they are an option." + (s.findings.some(f => f.gene === "ERBB2" && f.kind === "amp") ? " The drugs are listed with the ERBB2 (HER2) gene change below." : "") : b.score === 2 ? "In between. Labs usually run a second test (ISH) to check for extra HER2 gene copies before deciding." : b.score === 1 ? "A small amount of HER2 protein. In some cancers, notably breast, \"HER2-low\" can still matter for certain drugs." : "Little or no HER2 protein was seen.",
+      LOH: b.lohHigh ? "Large stretches of the tumor's DNA have lost one of their two copies. This is a kind of scar often left when one DNA repair system (homologous recombination) is broken. In ovarian cancer it can help decide on PARP inhibitor drugs; in other cancers its use is less settled, so ask the oncologist what it means here." : "Low. There is no sign of the DNA-repair scar this test looks for."
+    }[b.key] || "";
+    const d = t && t.drugs;
+    return `<div class="card"><div class="head" style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><strong>${esc(b.key)}: ${esc(b.value)}</strong>${b.high ? `<span class="badge b-ok">Can guide treatment</span>` : ""}</div><p>${esc(meaning)}</p>
+      ${d && (d.yours.length || d.any.length) ? `<div class="sub">FDA-approved based on this marker</div><ul class="clean">${[...d.yours, ...d.any].map(drugItem).join("")}</ul>` : ""}
+      ${t && t.trials && t.trials.total ? `<p><a href="${esc(t.trials.link)}" target="_blank" rel="noopener">${t.trials.total} recruiting trials</a> mention ${esc(t.trials.term)}.</p>` : ""}</div>`;
+  }).join("") : "";
+
+  const order = f => f.vus ? 3 : (f.drugs && (f.drugs.yours.length || f.drugs.any.length)) ? 0 : (f.drugs && f.drugs.other.length) ? 1 : 2;
+  const sorted = [...s.findings].sort((a, b) => order(a) - order(b));
+  $("findings").innerHTML = `<h2>Gene changes</h2>
+    <div class="callout info"><strong>About treatment guidelines.</strong> The drugs below come from FDA labels and an open research database. Oncologists also follow treatment guidelines, such as those from the National Comprehensive Cancer Network (NCCN), which can recommend drugs that aren't listed here. Ask the oncologist what the guidelines recommend for these findings. NCCN offers free guides for patients at <a href="https://www.nccn.org/" target="_blank" rel="noopener">nccn.org</a>.</div>` + sorted.map(findingCard).join("");
+  $("notParsed").innerHTML = `<p class="hint">Findings are read automatically. If a change on your report is missing here, type it into the box (for example "MET exon 14 skipping") and run again.</p>`;
+
+  const qs = [
+    actionable.length ? `Is ${actionable.map(f => [...f.drugs.yours, ...f.drugs.any].find(d => !d.withdrawn)).filter(Boolean).map(d => d.brand || d.generic).slice(0, 2).join(" or ")} an option for me, based on my ${actionable.map(f => f.gene + " " + f.alt).slice(0, 2).join(" and ")}?` : "Do any of these findings point to a targeted therapy for me?",
+    "Which findings matter most for my treatment, and which don't?",
+    s.findings.some(f => f.drugs && f.drugs.other.length && !f.drugs.yours.length) ? "Some drugs are approved for my change in other cancers. Would one be worth considering here, and would insurance cover it?" : null,
+    s.findings.some(f => f.trials && f.trials.total) ? "Am I a candidate for any of the clinical trials for my gene changes?" : null,
+    inh.length || germ.length ? "Should I have genetic counseling and germline (inherited) testing? Should my family be tested?" : null,
+    s.liquid ? "This was a blood test. Should any negative results be checked on tumor tissue?" : null,
+    vus.length ? "Should I worry about the variants of unknown significance?" : null,
+    s.biomarkers.some(b => b.high) ? "Does my TMB, MSI, or other marker mean immunotherapy could help me?" : null,
+    "Should this test be repeated later, for example with a blood test, if the cancer changes?"
+  ].filter(Boolean);
+  $("questions").innerHTML = qs.map(q => `<li>${esc(q)}</li>`).join("");
+  buildReport();
+  window.scrollTo({ top: $("out").offsetTop - 10, behavior: "smooth" });
+}
+
+let reportText = "";
+function buildReport() {
+  const s = state;
+  const line = d => `- ${d.brand || d.generic} (${d.generic}): "${d.statement}"${d.note ? " Note: " + d.note : ""}`;
+  const parts = s.findings.map(f => {
+    const d = f.drugs || { yours: [], any: [], other: [], nomatch: [] };
+    return [`### ${f.gene} ${f.alt}${f.vus ? " (variant of unknown significance)" : ""}${f.vaf != null ? `, VAF ${f.vaf}%` : ""}`,
+      `Gene role: ${GENES[f.gene] || "not described"}`,
+      inheritedNote(f) === "reported" ? "The report lists this in its germline section (found in normal DNA, likely inherited)." : inheritedNote(f) === "strong" ? "This gene is one where changes can be inherited." : "",
+      f.effect ? `The lab labels this change ${f.effect}-of-function.` : "",
+      f.ch ? "The lab says this change may come from clonal hematopoiesis (age-related changes in blood cells) rather than the tumor." : "",
+      d.yours.length ? `FDA-approved for this change in the chosen cancer:\n${d.yours.map(line).join("\n")}` : "",
+      d.any.length ? `FDA-approved for any solid tumor with this change:\n${d.any.map(line).join("\n")}` : "",
+      d.other.length ? `FDA-approved for this change in other cancers only:\n${d.other.map(line).join("\n")}` : "",
+      f.civic && f.civic.levelA && f.civic.levelA.length ? `Top-grade ("validated") evidence in the CIViC research database (not a guideline or FDA approval):\n${f.civic.levelA.map(e => `- ${e.therapy}${e.diseases.length ? " (" + e.diseases.slice(0, 3).join(", ") + ")" : ""}`).join("\n")}` : "",
+      f.trials ? `Recruiting trials mentioning "${f.trials.term}": ${f.trials.total}` : ""
+    ].filter(Boolean).join("\n");
+  }).join("\n\n");
+  const bio = s.biomarkers.map(b => `- ${b.key}: ${b.value}`).join("\n");
+  reportText = `Please help me understand my (or my family member's) tumor DNA test results. I am not a medical professional.
+
+Cancer type: ${s.cancer[0]}
+
+Below are the findings and the drug information from FDA labels. Using ONLY this information, explain in plain, kind, everyday language (about an 8th-grade reading level):
+1. What each gene change means, simply.
+2. Which findings could matter for treatment, and which probably don't.
+3. What the listed drugs are, and the difference between "approved for my cancer," "approved for any solid tumor," and "approved only in other cancers."
+4. What the tumor-wide markers (TMB, MSI, PD-L1, HRD, HER2, LOH) mean, if listed.
+5. Whether any finding suggests asking about genetic counseling for inherited risk.
+6. Good questions to ask the oncologist.
+
+Rules: Do not tell me which treatment to choose or predict how I will do. If something is not in this information, say so. Remind me that the care team has the full picture, and that treatment guidelines (such as NCCN's) may recommend drugs not listed here.
+
+## Tumor-wide markers
+${bio || "None reported."}
+
+## Gene changes
+${parts}
+
+Source: Tumor Report Translator (findings read automatically from the report; drug information from FDA labels via openFDA; trials from ClinicalTrials.gov; research evidence grades from CIViC).`;
+  $("reportNote").textContent = `Contains ${s.findings.length} finding${s.findings.length === 1 ? "" : "s"}. No names, dates, or report text are included.`;
+}
+
+const SAMPLE = `SAMPLE REPORT (FICTIONAL, FOR DEMONSTRATION ONLY)
+Comprehensive Genomic Profiling
+Disease: Lung adenocarcinoma
+
+BIOMARKER FINDINGS
+Tumor Mutational Burden - 12 Muts/Mb
+Microsatellite status - MS-Stable
+PD-L1 (22C3) TPS 60%
+
+GENOMIC FINDINGS
+KRAS G12C        VAF 31.2%
+STK11 Q37*       VAF 28.4%
+TP53 R273H       VAF 45.0%
+CDKN2A/B loss
+EGFR             not detected
+
+VARIANTS OF UNKNOWN SIGNIFICANCE
+BRCA2 V2109I     VAF 49.1%
+ATM D1853N       VAF 51.0%
+
+Note: This test analyzes tumor DNA and does not distinguish germline from somatic alterations.`;
+
+(function init() {
+  $("cancer").innerHTML = CANCERS.map((c, i) => `<option value="${i}">${esc(c[0])}</option>`).join("");
+  $("cancer").value = String(CANCERS.length - 1);
+  $("go").onclick = run;
+  $("sample").onclick = () => { $("report").value = SAMPLE; $("cancer").value = "0"; run(); };
+  // ?sample=1 opens the fictional sample (report text is never put in the address).
+  if (new URLSearchParams(location.search).has("sample")) $("sample").click();
+  $("clear").onclick = () => { pdfImagePages = []; $("report").value = ""; $("out").hidden = true; setStatus(""); state = null; };
+  $("techToggle").onchange = e => document.body.classList.toggle("show-tech", e.target.checked);
+  $("pdf").onchange = async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setStatus("Reading the PDF on your device...");
+    try {
+      const text = await readPdf(file);
+      if (text.replace(/\s/g, "").length < 50) { setStatus("This PDF has no readable text (it may be a scan or photo). Type the findings in instead.", true); return; }
+      $("report").value = text;
+      // Use the first diagnosis or specimen label (looking at the next line too) that names a cancer type we know.
+      $("cancer").value = String(CANCERS.length - 1);
+      for (const d of text.matchAll(/(?:disease|diagnosis|cancer type|tumor type|tumor specimen|specimen site|primary (?:tumor )?site)[:\s]+([^\n]{0,80}\n?[^\n]{0,60})/gi)) {
+        const k = CANCERS.findIndex(c => c[1] && c[1].test(d[1]));
+        if (k >= 0) { $("cancer").value = String(k); break; }
+      }
+      const imgs = readPdf.imagePages || [];
+      pdfImagePages = imgs;
+      setStatus("PDF read. Check the cancer type, then press Explain my report." + (imgs.length ? ` Note: page${imgs.length > 1 ? "s" : ""} ${imgs.join(", ")} ${imgs.length > 1 ? "are pictures" : "is a picture"} with no readable text, so anything printed only there (often the summary, TMB, or MSI) can't be read. Check those pages yourself, or type those results in.` : ""));
+    } catch (err) {
+      setStatus("Couldn't read that PDF. Try copying the text from it and pasting it in. (" + err.message + ")", true);
+    } finally { e.target.value = ""; }
+  };
+  $("dl").onclick = () => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([reportText], { type: "text/plain" }));
+    a.download = "tumor-report-summary-for-ai.txt";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  $("copy").onclick = async () => {
+    try { await navigator.clipboard.writeText(reportText); $("reportNote").textContent = "Copied. Paste it into your AI assistant."; }
+    catch (e) { $("reportNote").textContent = "Copy didn't work here. Use Download instead."; }
+  };
+})();
+</script>
+</body>
+</html>
