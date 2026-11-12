@@ -23,7 +23,7 @@ Genomic reports from labs like Foundation Medicine, Tempus, and Caris are writte
 - **Blood tests (liquid biopsies) are recognized.** For Guardant360, FoundationOne Liquid, or Tempus xF reports, the page explains why percentages are low and why a "not detected" result doesn't rule a change out.
 - **Variants of unknown significance** are listed last, and the tool explains why they usually don't change treatment.
 - **Questions to ask the doctor,** based on what was found.
-- **A clinician view.** "Show technical detail" adds variant allele fraction, CIViC evidence (sensitivity and resistance, levels A and B), and links to CIViC, OncoKB, and the [Drug Target Tracker](https://aneelpaulus.github.io/drug-target-tracker/).
+- **A clinician view.** The "Technical detail" switch adds variant allele fraction, CIViC evidence (sensitivity and resistance, levels A and B), and links to CIViC, OncoKB, and the [Drug Target Tracker](https://aneelpaulus.github.io/drug-target-tracker/).
 - **A summary for your AI assistant.** One click downloads a text file with the findings and drug information, plus instructions to explain them simply. It leaves out names, dates, and the original report text. Upload or paste it into ChatGPT, Claude, Gemini, or Copilot.
 
 ## Privacy
